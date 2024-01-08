@@ -6,3 +6,9 @@
 
 - Kernel version >= 6.2.0
 - amd64 (x86_64) architecture
+
+# Build
+
+```bash
+go get github.com/cilium/ebpf/cmd/bpf2go
+```
