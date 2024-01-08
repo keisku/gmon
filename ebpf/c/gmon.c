@@ -1,5 +1,6 @@
 #include "vmlinux.h"
 #include "maps.h"
+#include "goroutine.h"
 
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
@@ -46,6 +47,30 @@ int runtime_newproc1(struct pt_regs *ctx) {
         .stack_id = stack_id,
     };
     bpf_map_update_elem(&newproc1_events, &key, &event, BPF_ANY);
+    return 0;
+}
+
+SEC("uprobe/runtime.goexit1")
+int runtime_goexit1(struct pt_regs *ctx) {
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    int64_t go_id = 0;
+    if (read_goroutine_id(task, &go_id)) {
+        return 0;
+    }
+
+    int stack_id = 0;
+    if (read_stack_id(ctx, &stack_id)) {
+        return 0;
+    }
+
+    struct goexit1_event_key key = {
+        .goroutine_id = go_id,
+        .ktime = bpf_ktime_get_ns(),
+    };
+    struct goexit1_event event = {
+        .stack_id = stack_id,
+    };
+    bpf_map_update_elem(&goexit1_events, &key, &event, BPF_ANY);
     return 0;
 }
 

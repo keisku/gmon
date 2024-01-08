@@ -48,6 +48,7 @@ func Run(ctx context.Context, binPath string, pid int) (context.CancelFunc, erro
 	}
 	uprobeArgs := []uprobeArguments{
 		{"runtime.newproc1", objs.RuntimeNewproc1, uprobeOptions(pid), true},
+		{"runtime.goexit1", objs.RuntimeGoexit1, uprobeOptions(pid), false},
 	}
 	uprobeLinks := make([]link.Link, 0, len(uprobeArgs))
 	for i := 0; i < len(uprobeArgs); i++ {
@@ -66,6 +67,7 @@ func Run(ctx context.Context, binPath string, pid int) (context.CancelFunc, erro
 	}
 	processes := []func(*bpfObjects) error{
 		processNewproc1Events,
+		processGoexit1Events,
 	}
 	go func() {
 		for {
@@ -116,6 +118,34 @@ func processNewproc1Events(objs *bpfObjects) error {
 				stackIdSet[value.StackId] = struct{}{}
 				keysToDelete = append(keysToDelete, key)
 				slog.Info("runtime.newproc1",
+					slog.Int64("goroutine_id", int64(key.GoroutineId)),
+					slog.Int64("stack_id", int64(value.StackId)),
+					stackToLogAttr(stack),
+				)
+			}
+			return keysToDelete, len(keysToDelete)
+		},
+	)
+}
+
+func processGoexit1Events(objs *bpfObjects) error {
+	var key bpfGoexit1EventKey
+	var value bpfGoexit1Event
+	var keysToDelete []bpfGoexit1EventKey
+
+	return processEvents(
+		objs.StackAddresses,
+		objs.Goexit1Events,
+		func(mapIter *ebpf.MapIterator, stackIdSet map[int32]struct{}) (any, int) {
+			for mapIter.Next(&key, &value) {
+				stack, err := extractStack(objs, value.StackId)
+				if err != nil {
+					slog.Warn(err.Error())
+					continue
+				}
+				stackIdSet[value.StackId] = struct{}{}
+				keysToDelete = append(keysToDelete, key)
+				slog.Info("runtime.goexit1",
 					slog.Int64("goroutine_id", int64(key.GoroutineId)),
 					slog.Int64("stack_id", int64(value.StackId)),
 					stackToLogAttr(stack),

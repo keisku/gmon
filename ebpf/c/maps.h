@@ -37,4 +37,15 @@ struct newproc1_event {
 
 BPF_HASH(newproc1_events, struct newproc1_event_key, struct newproc1_event, 10240);
 
+struct goexit1_event_key {
+    int64_t goroutine_id;
+    uint64_t ktime; // To make this struct unique
+};
+
+struct goexit1_event {
+    int stack_id;
+};
+
+BPF_HASH(goexit1_events, struct goexit1_event_key, struct goexit1_event, 10240);
+
 #endif /* __MAPS_H__ */
