@@ -201,10 +201,10 @@ func extractStack(objs *bpfObjects, stackId int32) ([]string, error) {
 		if stackAddr == 0 {
 			break
 		}
-		if line := addr2line.Do(stackAddr); line == "" {
+		if entry := addr2line.Do(stackAddr); entry.IsEmpty() {
 			stack[stackCounter] = fmt.Sprintf("%x", stackAddr)
 		} else {
-			stack[stackCounter] = line
+			stack[stackCounter] = entry.String()
 		}
 		stackCounter++
 	}

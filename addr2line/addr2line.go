@@ -15,20 +15,27 @@ type symbols struct {
 	s  *gosym.Table
 }
 
-func (syms *symbols) pcToLine(addr uint64) string {
+func (syms *symbols) pcToLine(addr uint64) Line {
 	syms.mu.Lock()
 	defer syms.mu.Unlock()
 	if syms.s == nil {
-		return ""
+		return Line{}
 	}
 	file, line, f := syms.s.PCToLine(addr)
 	if f == nil {
-		return ""
+		return Line{}
 	}
 	if f.Func == nil {
-		return fmt.Sprintf("%s:%d", file, line)
+		return Line{
+			FileName: file,
+			Line:     line,
+		}
 	} else {
-		return fmt.Sprintf("%s at %s:%d", f.Func.Name, file, line)
+		return Line{
+			FileName: file,
+			Line:     line,
+			Func:     f.Func.Name,
+		}
 	}
 }
 
@@ -99,7 +106,10 @@ func initialize(f *elf.File) error {
 				return err
 			}
 			if line.File != nil {
-				lineEntries.Store(line.Address, fmt.Sprintf("%s:%d", line.File.Name, line.Line))
+				lineEntries.Store(line.Address, Line{
+					FileName: line.File.Name,
+					Line:     line.Line,
+				})
 			}
 		}
 	}
@@ -111,14 +121,31 @@ func initialize(f *elf.File) error {
 // returning it as a string formatted as "file:line".
 // If the symbols table is initialized from .gopclntab, it uses that for the conversion;
 // otherwise, it falls back to using the DWARF.
-func Do(addr uint64) string {
-	if s := syms.pcToLine(addr); s != "" {
-		return s
+func Do(addr uint64) Line {
+	if l := syms.pcToLine(addr); !l.IsEmpty() {
+		return l
 	}
 	if line, ok := lineEntries.Load(addr); ok {
-		if s, ok := line.(string); ok {
-			return s
+		if l, ok := line.(Line); ok {
+			return l
 		}
 	}
-	return ""
+	return Line{}
+}
+
+type Line struct {
+	FileName string
+	Line     int
+	Func     string
+}
+
+func (e Line) IsEmpty() bool {
+	return e.FileName == "" && e.Line == 0 && e.Func == ""
+}
+
+func (e Line) String() string {
+	if e.Func == "" {
+		return fmt.Sprintf("%s:%d", e.FileName, e.Line)
+	}
+	return fmt.Sprintf("%s at %s:%d", e.Func, e.FileName, e.Line)
 }
