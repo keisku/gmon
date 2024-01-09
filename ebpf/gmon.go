@@ -248,7 +248,10 @@ func logTracePipe(done <-chan struct{}) {
 		scanner := bufio.NewScanner(tracePipe)
 		// Read and print the trace data.
 		for scanner.Scan() {
-			slog.Debug(strings.TrimSpace(scanner.Text()))
+			msg := strings.TrimSpace(scanner.Text())
+			if strings.Contains(msg, "gmon") {
+				slog.Debug(msg)
+			}
 		}
 		if err := scanner.Err(); err != nil {
 			if !errors.Is(err, fs.ErrClosed) {
