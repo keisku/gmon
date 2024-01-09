@@ -21,22 +21,22 @@ SEC("uretprobe/runtime.newproc1")
 int runtime_newproc1(struct pt_regs *ctx) {
     void *newg_p = (void *)PT_REGS_RC_CORE(ctx);
     if (newg_p == NULL) {
-        bpf_printk("runtime.newproc1 | failed to extract new goroutine pointer from retval\n");
+        bpf_printk("uretprobe/runtime.newproc1 | failed to extract new goroutine pointer from retval\n");
         return 0;
     }
     // `pahole -C runtime.g /path/to/gobinary 2>/dev/null` shows the offsets of the goid which is 152.
     int64_t goid = 0;
     if (bpf_core_read_user(&goid, sizeof(int64_t), newg_p + 152)) {
-        bpf_printk("runtime.newproc1 | failed to extract goroutine id from newg with the offset\n");
+        bpf_printk("uretprobe/runtime.newproc1 | failed to extract goroutine id from newg with the offset\n");
         return 0;
     }
     if (goid == 0) {
-        bpf_printk("runtime.newproc1 | failed to extract goroutine id\n");
+        bpf_printk("uretprobe/runtime.newproc1 | failed to extract goroutine id\n");
         return 0;
     }
     int stack_id = 0;
     if (read_stack_id(ctx, &stack_id)) {
-        bpf_printk("runtime.newproc1 | failed to read stack id\n");
+        bpf_printk("uretprobe/runtime.newproc1 | failed to read stack id\n");
         return 0;
     }
     struct newproc1_event_key key = {
@@ -55,11 +55,13 @@ int runtime_goexit1(struct pt_regs *ctx) {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
     int64_t go_id = 0;
     if (read_goroutine_id(task, &go_id)) {
+        bpf_printk("uprobe/runtime.goexit1 | failed to read goroutine id\n");
         return 0;
     }
 
     int stack_id = 0;
     if (read_stack_id(ctx, &stack_id)) {
+        bpf_printk("uprobe/runtime.goexit1 | failed to read stack id\n");
         return 0;
     }
 
