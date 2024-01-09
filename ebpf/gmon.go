@@ -1,12 +1,17 @@
 package ebpf
 
 import (
+	"bufio"
 	"context"
 	"debug/elf"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cilium/ebpf"
@@ -29,6 +34,7 @@ func Run(ctx context.Context, binPath string, pid int) (context.CancelFunc, erro
 	if err := loadBpfObjects(&objs, nil); err != nil {
 		return cancel, err
 	}
+	go logTracePipe(wrappedCtx.Done())
 	elfFile, err := elf.Open(binPath)
 	if err != nil {
 		return cancel, err
@@ -227,4 +233,28 @@ func uprobeOptions(pid int) *link.UprobeOptions {
 		return &link.UprobeOptions{PID: pid}
 	}
 	return nil
+}
+
+func logTracePipe(done <-chan struct{}) {
+	tracePipe, err := os.Open("/sys/kernel/debug/tracing/trace_pipe")
+	if err != nil {
+		slog.Error("open trace_pipe", slog.String("error", err.Error()))
+		return
+	}
+	defer tracePipe.Close()
+
+	go func() {
+		// Create a bufio.Scanner to read the trace data.
+		scanner := bufio.NewScanner(tracePipe)
+		// Read and print the trace data.
+		for scanner.Scan() {
+			slog.Debug(strings.TrimSpace(scanner.Text()))
+		}
+		if err := scanner.Err(); err != nil {
+			if !errors.Is(err, fs.ErrClosed) {
+				slog.Error("read trace_pipe", slog.String("error", err.Error()))
+			}
+		}
+	}()
+	<-done
 }
