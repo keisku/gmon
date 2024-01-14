@@ -1,6 +1,6 @@
 module github.com/keisku/gmon
 
-go 1.21.5
+go 1.21.6
 
 require (
 	github.com/cilium/ebpf v0.12.3
@@ -10,7 +10,7 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2 // indirect
-	golang.org/x/sys v0.14.1-0.20231108175955-e4099bfacb8c // indirect
+	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
+	golang.org/x/sys v0.16.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
