@@ -47,7 +47,10 @@ func main() {
 		errlog.Fatalln(err)
 	}
 
-	eBPFClose, err := ebpf.Run(ctx, binPath, pid)
+	eBPFClose, err := ebpf.Run(ctx, ebpf.Config{
+		BinPath: binPath,
+		Pid:     pid,
+	})
 	if err != nil {
 		errlog.Fatalln(err)
 	}

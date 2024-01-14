@@ -28,21 +28,21 @@ const maxStackDepth = 20
 
 var stackFrameSize = (strconv.IntSize / 8)
 
-func Run(ctx context.Context, binPath string, pid int) (context.CancelFunc, error) {
+func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 	wrappedCtx, cancel := context.WithCancel(ctx)
 	objs := bpfObjects{}
 	if err := loadBpfObjects(&objs, nil); err != nil {
 		return cancel, err
 	}
 	go logTracePipe(wrappedCtx.Done())
-	elfFile, err := elf.Open(binPath)
+	elfFile, err := elf.Open(config.BinPath)
 	if err != nil {
 		return cancel, err
 	}
 	if err := addr2line.Init(elfFile); err != nil {
 		slog.Debug("initialize addr2line", slog.Any("err", err))
 	}
-	ex, err := link.OpenExecutable(binPath)
+	ex, err := link.OpenExecutable(config.BinPath)
 	if err != nil {
 		return cancel, err
 	}
@@ -53,8 +53,8 @@ func Run(ctx context.Context, binPath string, pid int) (context.CancelFunc, erro
 		ret    bool
 	}
 	uprobeArgs := []uprobeArguments{
-		{"runtime.newproc1", objs.RuntimeNewproc1, uprobeOptions(pid), true},
-		{"runtime.goexit1", objs.RuntimeGoexit1, uprobeOptions(pid), false},
+		{"runtime.newproc1", objs.RuntimeNewproc1, uprobeOptions(config.Pid), true},
+		{"runtime.goexit1", objs.RuntimeGoexit1, uprobeOptions(config.Pid), false},
 	}
 	uprobeLinks := make([]link.Link, 0, len(uprobeArgs))
 	for i := 0; i < len(uprobeArgs); i++ {
