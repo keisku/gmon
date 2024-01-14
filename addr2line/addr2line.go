@@ -15,26 +15,32 @@ type symbols struct {
 	s  *gosym.Table
 }
 
-func (syms *symbols) pcToLine(addr uint64) Line {
+func (syms *symbols) pcToLine(addr uint64) Entry {
 	syms.mu.Lock()
 	defer syms.mu.Unlock()
 	if syms.s == nil {
-		return Line{}
+		return Entry{
+			Addr: addr,
+		}
 	}
 	file, line, f := syms.s.PCToLine(addr)
 	if f == nil {
-		return Line{}
+		return Entry{
+			Addr: addr,
+		}
 	}
 	if f.Func == nil {
-		return Line{
+		return Entry{
 			FileName: file,
 			Line:     line,
+			Addr:     addr,
 		}
 	} else {
-		return Line{
+		return Entry{
 			FileName: file,
 			Line:     line,
 			Func:     f.Func.Name,
+			Addr:     addr,
 		}
 	}
 }
@@ -106,7 +112,7 @@ func initialize(f *elf.File) error {
 				return err
 			}
 			if line.File != nil {
-				lineEntries.Store(line.Address, Line{
+				lineEntries.Store(line.Address, Entry{
 					FileName: line.File.Name,
 					Line:     line.Line,
 				})
@@ -117,35 +123,59 @@ func initialize(f *elf.File) error {
 	return nil
 }
 
-// Do converts a program counter address to a file name and line number,
-// returning it as a string formatted as "file:line".
+// Do converts a program counter address to Entry.
 // If the symbols table is initialized from .gopclntab, it uses that for the conversion;
 // otherwise, it falls back to using the DWARF.
-func Do(addr uint64) Line {
-	if l := syms.pcToLine(addr); !l.IsEmpty() {
-		return l
+func Do(addr uint64) Entry {
+	if e := syms.pcToLine(addr); !e.hasAddrOnly() {
+		return e
 	}
-	if line, ok := lineEntries.Load(addr); ok {
-		if l, ok := line.(Line); ok {
-			return l
+	if entry, ok := lineEntries.Load(addr); ok {
+		if e, ok := entry.(Entry); ok {
+			return e
 		}
 	}
-	return Line{}
+	return Entry{
+		Addr: addr,
+	}
 }
 
-type Line struct {
+// Entry represents a single entry in a stack trace.
+type Entry struct {
 	FileName string
 	Line     int
 	Func     string
+	Addr     uint64
 }
 
-func (e Line) IsEmpty() bool {
-	return e.FileName == "" && e.Line == 0 && e.Func == ""
+// hasAddrOnly returns true if the entry has only an address.
+// It indicates that the entry is not resolved to a file name, line number, or function name.
+func (e Entry) hasAddrOnly() bool {
+	return e.FileName == "" && e.Line == 0 && e.Func == "" && e.Addr != 0
 }
 
-func (e Line) String() string {
+func (e Entry) String() string {
+	if e.hasAddrOnly() {
+		return fmt.Sprintf("%x", e.Addr)
+	}
 	if e.Func == "" {
 		return fmt.Sprintf("%s:%d", e.FileName, e.Line)
 	}
+	if e.FileName == "" {
+		return e.Func
+	}
 	return fmt.Sprintf("%s at %s:%d", e.Func, e.FileName, e.Line)
+}
+
+type Stack []Entry
+
+func (s Stack) LogAttr() slog.Attr {
+	attrs := make([]slog.Attr, len(s))
+	for i, e := range s {
+		attrs[i] = slog.String(fmt.Sprintf("%d", i), e.String())
+	}
+	return slog.Attr{
+		Key:   "stack",
+		Value: slog.GroupValue(attrs...),
+	}
 }

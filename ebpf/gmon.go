@@ -126,7 +126,7 @@ func processNewproc1Events(objs *bpfObjects) error {
 				slog.Info("runtime.newproc1",
 					slog.Int64("goroutine_id", int64(key.GoroutineId)),
 					slog.Int64("stack_id", int64(value.StackId)),
-					stackToLogAttr(stack),
+					stack.LogAttr(),
 				)
 			}
 			return keysToDelete, len(keysToDelete)
@@ -154,7 +154,7 @@ func processGoexit1Events(objs *bpfObjects) error {
 				slog.Info("runtime.goexit1",
 					slog.Int64("goroutine_id", int64(key.GoroutineId)),
 					slog.Int64("stack_id", int64(value.StackId)),
-					stackToLogAttr(stack),
+					stack.LogAttr(),
 				)
 			}
 			return keysToDelete, len(keysToDelete)
@@ -194,8 +194,8 @@ func processEvents(
 	return nil
 }
 
-func extractStack(objs *bpfObjects, stackId int32) ([]string, error) {
-	stack := make([]string, maxStackDepth)
+func extractStack(objs *bpfObjects, stackId int32) (addr2line.Stack, error) {
+	stack := make(addr2line.Stack, maxStackDepth)
 	stackBytes, err := objs.StackAddresses.LookupBytes(stackId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup stack address: %w", err)
@@ -207,11 +207,7 @@ func extractStack(objs *bpfObjects, stackId int32) ([]string, error) {
 		if stackAddr == 0 {
 			break
 		}
-		if entry := addr2line.Do(stackAddr); entry.IsEmpty() {
-			stack[stackCounter] = fmt.Sprintf("%x", stackAddr)
-		} else {
-			stack[stackCounter] = entry.String()
-		}
+		stack[stackCounter] = addr2line.Do(stackAddr)
 		stackCounter++
 	}
 	return stack[0:stackCounter], nil
