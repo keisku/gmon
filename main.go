@@ -23,6 +23,10 @@ var level slog.Level
 var pid int
 var binPath string
 var pprofPort int
+var uptimeDebug string
+var uptimeInfo string
+var uptimeWarn string
+var uptimeError string
 
 func main() {
 	errlog := log.New(os.Stderr, "", log.LstdFlags)
@@ -36,6 +40,11 @@ func main() {
 		[]slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError}))
 	flag.IntVar(&pid, "pid", pid, "Useful when tracing programs that have many running instances")
 	flag.IntVar(&pprofPort, "pprof-port", pprofPort, "Port to be used for pprof server")
+	uptimeHelpFmt := `Uptime threshold for %s level log. E.g., "0", "100ms", "1s500ms". See https://pkg.go.dev/time#ParseDuration`
+	flag.StringVar(&uptimeDebug, "uptime-debug", "0", fmt.Sprintf(uptimeHelpFmt, "debug"))
+	flag.StringVar(&uptimeInfo, "uptime-info", "1s", fmt.Sprintf(uptimeHelpFmt, "info"))
+	flag.StringVar(&uptimeWarn, "uptime-warn", "10s", fmt.Sprintf(uptimeHelpFmt, "warn"))
+	flag.StringVar(&uptimeError, "uptime-error", "1m", fmt.Sprintf(uptimeHelpFmt, "error"))
 	flag.Parse()
 	opts := &slog.HandlerOptions{Level: level}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, opts)))
@@ -47,10 +56,18 @@ func main() {
 		errlog.Fatalln(err)
 	}
 
-	eBPFClose, err := ebpf.Run(ctx, ebpf.Config{
-		BinPath: binPath,
-		Pid:     pid,
-	})
+	ebpfConfig, err := ebpf.NewConfig(
+		binPath,
+		pid,
+		uptimeDebug,
+		uptimeInfo,
+		uptimeWarn,
+		uptimeError,
+	)
+	if err != nil {
+		errlog.Fatalln(err)
+	}
+	eBPFClose, err := ebpf.Run(ctx, ebpfConfig)
 	if err != nil {
 		errlog.Fatalln(err)
 	}

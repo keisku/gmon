@@ -29,20 +29,21 @@ const maxStackDepth = 20
 var stackFrameSize = (strconv.IntSize / 8)
 
 func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
+	slog.Debug("eBPF programs start with config", slog.String("config", config.String()))
 	wrappedCtx, cancel := context.WithCancel(ctx)
 	objs := bpfObjects{}
 	if err := loadBpfObjects(&objs, nil); err != nil {
 		return cancel, err
 	}
 	go logTracePipe(wrappedCtx.Done())
-	elfFile, err := elf.Open(config.BinPath)
+	elfFile, err := elf.Open(config.binPath)
 	if err != nil {
 		return cancel, err
 	}
 	if err := addr2line.Init(elfFile); err != nil {
 		slog.Debug("initialize addr2line", slog.Any("err", err))
 	}
-	ex, err := link.OpenExecutable(config.BinPath)
+	ex, err := link.OpenExecutable(config.binPath)
 	if err != nil {
 		return cancel, err
 	}
@@ -53,8 +54,8 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 		ret    bool
 	}
 	uprobeArgs := []uprobeArguments{
-		{"runtime.newproc1", objs.RuntimeNewproc1, uprobeOptions(config.Pid), true},
-		{"runtime.goexit1", objs.RuntimeGoexit1, uprobeOptions(config.Pid), false},
+		{"runtime.newproc1", objs.RuntimeNewproc1, uprobeOptions(config.pid), true},
+		{"runtime.goexit1", objs.RuntimeGoexit1, uprobeOptions(config.pid), false},
 	}
 	uprobeLinks := make([]link.Link, 0, len(uprobeArgs))
 	for i := 0; i < len(uprobeArgs); i++ {
@@ -71,10 +72,15 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 		}
 		uprobeLinks = append(uprobeLinks, link)
 	}
-	processes := []func(*bpfObjects) error{
-		processNewproc1Events,
-		processGoexit1Events,
+	goroutineQueue := make(chan goroutine)
+	reporter := &reporter{
+		goroutineQueue: goroutineQueue,
+		uptimeDebug:    config.uptimeDebug,
+		uptimeInfo:     config.uptimeInfo,
+		uptimeWarn:     config.uptimeWarn,
+		uptimeError:    config.uptimeError,
 	}
+	go reporter.run(wrappedCtx)
 	go func() {
 		for {
 			select {
@@ -82,13 +88,8 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 				slog.Debug("eBPF programs stop")
 				return
 			case <-time.Tick(200 * time.Millisecond):
-				for i := 0; i < len(processes); i++ {
-					go func(fIdx int) {
-						if err := processes[fIdx](&objs); err != nil {
-							slog.Warn(err.Error())
-						}
-					}(i)
-				}
+				processNewproc1Events(&objs, goroutineQueue)
+				processGoexit1Events(&objs, goroutineQueue)
 			}
 		}
 	}()
@@ -106,7 +107,7 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 	}, nil
 }
 
-func processNewproc1Events(objs *bpfObjects) error {
+func processNewproc1Events(objs *bpfObjects, goroutineQueue chan<- goroutine) error {
 	var key bpfNewproc1EventKey
 	var value bpfNewproc1Event
 	var keysToDelete []bpfNewproc1EventKey
@@ -123,18 +124,19 @@ func processNewproc1Events(objs *bpfObjects) error {
 				}
 				stackIdSet[value.StackId] = struct{}{}
 				keysToDelete = append(keysToDelete, key)
-				slog.Info("runtime.newproc1",
-					slog.Int64("goroutine_id", int64(key.GoroutineId)),
-					slog.Int64("stack_id", int64(value.StackId)),
-					stack.LogAttr(),
-				)
+				goroutineQueue <- goroutine{
+					Id:         key.GoroutineId,
+					ObservedAt: time.Now(),
+					Stack:      stack,
+					Exit:       false,
+				}
 			}
 			return keysToDelete, len(keysToDelete)
 		},
 	)
 }
 
-func processGoexit1Events(objs *bpfObjects) error {
+func processGoexit1Events(objs *bpfObjects, goroutineQueue chan<- goroutine) error {
 	var key bpfGoexit1EventKey
 	var value bpfGoexit1Event
 	var keysToDelete []bpfGoexit1EventKey
@@ -151,11 +153,12 @@ func processGoexit1Events(objs *bpfObjects) error {
 				}
 				stackIdSet[value.StackId] = struct{}{}
 				keysToDelete = append(keysToDelete, key)
-				slog.Info("runtime.goexit1",
-					slog.Int64("goroutine_id", int64(key.GoroutineId)),
-					slog.Int64("stack_id", int64(value.StackId)),
-					stack.LogAttr(),
-				)
+				goroutineQueue <- goroutine{
+					Id:         key.GoroutineId,
+					ObservedAt: time.Now(),
+					Stack:      stack,
+					Exit:       true,
+				}
 			}
 			return keysToDelete, len(keysToDelete)
 		},
