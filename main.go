@@ -40,7 +40,7 @@ func main() {
 	flag.IntVar(&pprofPort, "pprof-port", pprofPort, "Port to be used for pprof server")
 	durationHelpFmt := `%s E.g., "0", "100ms", "1s500ms". See https://pkg.go.dev/time#ParseDuration`
 	flag.StringVar(&uptimeThreshold, "uptime-threshold", "0", fmt.Sprintf(durationHelpFmt, "Uptime threshold for logging."))
-	flag.StringVar(&monitorExpiryThreshold, "monitor-expiry-threshold", "5m", fmt.Sprintf(durationHelpFmt, "Remove a goroutine from monitoring when its uptime exceeds this value. If set to 0, the goroutine will never be deleted."))
+	flag.StringVar(&monitorExpiryThreshold, "monitor-expiry-threshold", "0", fmt.Sprintf(durationHelpFmt, "Remove a goroutine from monitoring when its uptime exceeds this value. If set to 0, the goroutine will never be deleted."))
 	flag.Parse()
 	opts := &slog.HandlerOptions{Level: level}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, opts)))

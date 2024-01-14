@@ -60,7 +60,7 @@ func (r *reporter) reportGoroutineUptime() {
 		if uptime > r.uptimeThreshold {
 			slog.Info("goroutine is running", attrs...)
 		}
-		if uptime > r.monitorExpiryThreshold {
+		if r.monitorExpiryThreshold > 0 && uptime > r.monitorExpiryThreshold {
 			slog.Info(fmt.Sprintf("goroutine is still running after %s, then remove it from the monitoring targets", r.monitorExpiryThreshold), attrs...)
 			r.goroutineMap.Delete(g.Id)
 		}
