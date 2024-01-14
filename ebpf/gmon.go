@@ -74,8 +74,9 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 	}
 	goroutineQueue := make(chan goroutine)
 	reporter := &reporter{
-		goroutineQueue:  goroutineQueue,
-		uptimeThreshold: config.uptimeThreshold,
+		goroutineQueue:         goroutineQueue,
+		uptimeThreshold:        config.uptimeThreshold,
+		monitorExpiryThreshold: config.monitorExpiryThreshold,
 	}
 	go reporter.run(wrappedCtx)
 	go func() {

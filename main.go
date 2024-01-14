@@ -24,6 +24,7 @@ var pid int
 var binPath string
 var pprofPort int
 var uptimeThreshold string
+var monitorExpiryThreshold string
 
 func main() {
 	errlog := log.New(os.Stderr, "", log.LstdFlags)
@@ -37,7 +38,9 @@ func main() {
 		[]slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError}))
 	flag.IntVar(&pid, "pid", pid, "Useful when tracing programs that have many running instances")
 	flag.IntVar(&pprofPort, "pprof-port", pprofPort, "Port to be used for pprof server")
-	flag.StringVar(&uptimeThreshold, "uptime-threshold", "0", `Uptime threshold for logging. E.g., "0", "100ms", "1s500ms". See https://pkg.go.dev/time#ParseDuration`)
+	durationHelpFmt := `%s E.g., "0", "100ms", "1s500ms". See https://pkg.go.dev/time#ParseDuration`
+	flag.StringVar(&uptimeThreshold, "uptime-threshold", "0", fmt.Sprintf(durationHelpFmt, "Uptime threshold for logging."))
+	flag.StringVar(&monitorExpiryThreshold, "monitor-expiry-threshold", "5m", fmt.Sprintf(durationHelpFmt, "Remove a goroutine from monitoring when its uptime exceeds this value. If set to 0, the goroutine will never be deleted."))
 	flag.Parse()
 	opts := &slog.HandlerOptions{Level: level}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, opts)))
@@ -53,6 +56,7 @@ func main() {
 		binPath,
 		pid,
 		uptimeThreshold,
+		monitorExpiryThreshold,
 	)
 	if err != nil {
 		errlog.Fatalln(err)

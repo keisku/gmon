@@ -2,6 +2,7 @@ package ebpf
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -17,9 +18,10 @@ type goroutine struct {
 }
 
 type reporter struct {
-	goroutineQueue  <-chan goroutine
-	goroutineMap    sync.Map
-	uptimeThreshold time.Duration
+	goroutineQueue         <-chan goroutine
+	goroutineMap           sync.Map
+	uptimeThreshold        time.Duration
+	monitorExpiryThreshold time.Duration
 }
 
 func (r *reporter) run(ctx context.Context) {
@@ -57,6 +59,10 @@ func (r *reporter) reportGoroutineUptime() {
 		}
 		if uptime > r.uptimeThreshold {
 			slog.Info("goroutine is running", attrs...)
+		}
+		if uptime > r.monitorExpiryThreshold {
+			slog.Info(fmt.Sprintf("goroutine is still running after %s, then remove it from the monitoring targets", r.monitorExpiryThreshold), attrs...)
+			r.goroutineMap.Delete(g.Id)
 		}
 		return true
 	})
