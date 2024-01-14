@@ -17,9 +17,9 @@ type goroutine struct {
 }
 
 type reporter struct {
-	goroutineQueue                                   <-chan goroutine
-	goroutineMap                                     sync.Map
-	uptimeDebug, uptimeInfo, uptimeWarn, uptimeError time.Duration
+	goroutineQueue  <-chan goroutine
+	goroutineMap    sync.Map
+	uptimeThreshold time.Duration
 }
 
 func (r *reporter) run(ctx context.Context) {
@@ -50,20 +50,13 @@ func (r *reporter) reportGoroutineUptime() {
 		g := value.(goroutine)
 		uptime := time.Since(g.ObservedAt)
 		// TODO: Report gauge metrics.
-		msg := "goroutine is running"
 		attrs := []any{
 			slog.Duration("uptime", uptime),
 			slog.Int64("goroutine_id", g.Id),
 			g.Stack.LogAttr(),
 		}
-		if uptime > r.uptimeError {
-			slog.Error(msg, attrs...)
-		} else if uptime > r.uptimeWarn {
-			slog.Warn(msg, attrs...)
-		} else if uptime > r.uptimeInfo {
-			slog.Info(msg, attrs...)
-		} else if uptime > r.uptimeDebug {
-			slog.Debug(msg, attrs...)
+		if uptime > r.uptimeThreshold {
+			slog.Info("goroutine is running", attrs...)
 		}
 		return true
 	})
@@ -74,21 +67,14 @@ func (r *reporter) storeGoroutine(g goroutine) {
 	if loaded {
 		oldg := v.(goroutine)
 		uptime := time.Since(oldg.ObservedAt)
-		msg := "goroutine is terminated"
 		attrs := []any{
 			slog.Duration("uptime", uptime),
 			slog.Int64("goroutine_id", g.Id),
 			// Don't use g.Stack since goexit1 doesn't have informative stack.
 			oldg.Stack.LogAttr(),
 		}
-		if uptime > r.uptimeError {
-			slog.Error(msg, attrs...)
-		} else if uptime > r.uptimeWarn {
-			slog.Warn(msg, attrs...)
-		} else if uptime > r.uptimeInfo {
-			slog.Info(msg, attrs...)
-		} else if uptime > r.uptimeDebug {
-			slog.Debug(msg, attrs...)
+		if uptime > r.uptimeThreshold {
+			slog.Info("goroutine is terminated", attrs...)
 		}
 		r.goroutineMap.Delete(oldg.Id)
 		return

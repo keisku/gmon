@@ -6,44 +6,31 @@ import (
 )
 
 type Config struct {
-	binPath                                          string
-	pid                                              int
-	uptimeDebug, uptimeInfo, uptimeWarn, uptimeError time.Duration
+	binPath         string
+	pid             int
+	uptimeThreshold time.Duration
 }
 
 func NewConfig(
 	binPath string,
 	Pid int,
-	uptimeDebug string,
-	uptimeInfo string,
-	uptimeWarn string,
-	uptimeError string,
+	uptimeThreshold string,
 ) (Config, error) {
-	uptimes := make([]time.Duration, 4)
-	for i, uptime := range []string{uptimeDebug, uptimeInfo, uptimeWarn, uptimeError} {
-		d, err := time.ParseDuration(uptime)
-		if err != nil {
-			return Config{}, err
-		}
-		uptimes[i] = d
+	d, err := time.ParseDuration(uptimeThreshold)
+	if err != nil {
+		return Config{}, err
 	}
 	return Config{
-		binPath:     binPath,
-		pid:         Pid,
-		uptimeDebug: uptimes[0],
-		uptimeInfo:  uptimes[1],
-		uptimeWarn:  uptimes[2],
-		uptimeError: uptimes[3],
+		binPath:         binPath,
+		pid:             Pid,
+		uptimeThreshold: d,
 	}, nil
 }
 
 func (c Config) String() string {
-	return fmt.Sprintf("binPath: %s, pid: %d, uptimeDebug: %s, uptimeInfo: %s, uptimeWarn: %s, uptimeError: %s",
+	return fmt.Sprintf("binPath: %s, pid: %d, uptimeThreshold: %s",
 		c.binPath,
 		c.pid,
-		c.uptimeDebug,
-		c.uptimeInfo,
-		c.uptimeWarn,
-		c.uptimeError,
+		c.uptimeThreshold,
 	)
 }
