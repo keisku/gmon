@@ -72,6 +72,9 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 		}
 		uprobeLinks = append(uprobeLinks, link)
 	}
+	if len(uprobeLinks) == 0 {
+		return cancel, errors.New("no uprobe links")
+	}
 	goroutineQueue := make(chan goroutine)
 	reporter := &reporter{
 		goroutineQueue:         goroutineQueue,
