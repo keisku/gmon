@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/keisku/gmon/addr2line"
+	"github.com/keisku/gmon/bininfo"
 )
 
 type goroutine struct {
 	Id         int64
 	ObservedAt time.Time
-	Stack      addr2line.Stack
+	Stack      bininfo.Stack
 	Exit       bool
 }
 
