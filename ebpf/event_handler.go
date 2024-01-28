@@ -6,21 +6,13 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf"
-	"github.com/keisku/gmon/bininfo"
+	"github.com/go-delve/delve/pkg/proc"
 )
 
 type eventHandler struct {
-	bininfo        *bininfo.BinInfo
+	lookupStack    func(int32) ([]*proc.Function, error)
 	goroutineQueue chan<- goroutine
 	objs           *bpfObjects
-}
-
-func (h *eventHandler) extractStack(stackId int32) (bininfo.Stack, error) {
-	stackBytes, err := h.objs.StackAddresses.LookupBytes(stackId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to lookup stack address: %w", err)
-	}
-	return h.bininfo.Stack(stackBytes), nil
 }
 
 func (h *eventHandler) handle(
@@ -65,7 +57,7 @@ func (h *eventHandler) handleNewproc1() error {
 		h.objs.Newproc1Events,
 		func(mapIter *ebpf.MapIterator, stackIdSet map[int32]struct{}) (any, int) {
 			for mapIter.Next(&key, &value) {
-				stack, err := h.extractStack(value.StackId)
+				stack, err := h.lookupStack(value.StackId)
 				if err != nil {
 					slog.Warn(err.Error())
 					continue
@@ -94,7 +86,7 @@ func (h *eventHandler) handleGoexit1() error {
 		h.objs.Goexit1Events,
 		func(mapIter *ebpf.MapIterator, stackIdSet map[int32]struct{}) (any, int) {
 			for mapIter.Next(&key, &value) {
-				stack, err := h.extractStack(value.StackId)
+				stack, err := h.lookupStack(value.StackId)
 				if err != nil {
 					slog.Warn(err.Error())
 					continue

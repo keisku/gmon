@@ -3,15 +3,19 @@ package ebpf
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
+	"github.com/go-delve/delve/pkg/proc"
 	"github.com/keisku/gmon/bininfo"
 )
 
@@ -25,48 +29,74 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 	if err := loadBpfObjects(&objs, nil); err != nil {
 		return cancel, err
 	}
-	go logTracePipe(wrappedCtx.Done())
-	bininfo, err := bininfo.NewBinInfo(config.binPath)
+	biTranslator, err := bininfo.NewTranslator(config.binPath)
 	if err != nil {
 		return cancel, err
 	}
+	go logTracePipe(wrappedCtx.Done())
 	ex, err := link.OpenExecutable(config.binPath)
 	if err != nil {
 		return cancel, err
 	}
-	type uprobeArguments struct {
-		symbol string
-		prog   *ebpf.Program
-		opts   *link.UprobeOptions
-		ret    bool
+	_, err = linkUprobe(
+		ex,
+		objs.RuntimeNewproc1,
+		"runtime.newproc1",
+		true,
+		config.pid,
+		biTranslator.Address,
+	)
+	if err != nil {
+		return cancel, err
 	}
-	uprobeArgs := []uprobeArguments{
-		{"runtime.newproc1", objs.RuntimeNewproc1, uprobeOptions(config.pid), true},
-		{"runtime.goexit1", objs.RuntimeGoexit1, uprobeOptions(config.pid), false},
-	}
-	uprobeLinks := make([]link.Link, 0, len(uprobeArgs))
-	for i := 0; i < len(uprobeArgs); i++ {
-		var link link.Link
-		var err error
-		if uprobeArgs[i].ret {
-			link, err = ex.Uretprobe(uprobeArgs[i].symbol, uprobeArgs[i].prog, uprobeArgs[i].opts)
-		} else {
-			link, err = ex.Uprobe(uprobeArgs[i].symbol, uprobeArgs[i].prog, uprobeArgs[i].opts)
-		}
-		if err != nil {
-			slog.Debug(err.Error())
-			continue
-		}
-		uprobeLinks = append(uprobeLinks, link)
-	}
-	if len(uprobeLinks) == 0 {
-		return cancel, errors.New("no uprobe links")
+	_, err = linkUprobe(
+		ex,
+		objs.RuntimeGoexit1,
+		"runtime.goexit1",
+		false,
+		config.pid,
+		biTranslator.Address,
+	)
+	if err != nil {
+		return cancel, err
 	}
 	goroutineQueue := make(chan goroutine)
+	// lookupStack is a copy of the function in tracee.
+	// https://github.com/aquasecurity/tracee/blob/f61866b4e2277d2a7dddc6cd77a67cd5a5da3b14/pkg/ebpf/events_pipeline.go#L642-L681
+	const maxStackDepth = 20
+	var stackFrameSize = (strconv.IntSize / 8)
 	eventhandler := &eventHandler{
 		goroutineQueue: goroutineQueue,
 		objs:           &objs,
-		bininfo:        bininfo,
+		lookupStack: func(id int32) ([]*proc.Function, error) {
+			stackBytes, err := objs.StackAddresses.LookupBytes(id)
+			if err != nil {
+				return nil, fmt.Errorf("failed to lookup stack address: %w", err)
+			}
+			stack := make([]*proc.Function, maxStackDepth)
+			stackCounter := 0
+			for i := 0; i < len(stackBytes); i += stackFrameSize {
+				stackBytes[stackCounter] = 0
+				stackAddr := binary.LittleEndian.Uint64(stackBytes[i : i+stackFrameSize])
+				if stackAddr == 0 {
+					break
+				}
+				f := biTranslator.PCToFunc(stackAddr)
+				if f == nil {
+					// I don't know why, but a function address sometime should be last 3 bytes.
+					// At leaset, I observerd this behavior in the following binaries:
+					// - /usr/bin/dockerd
+					// - /usr/bin/containerd
+					f = biTranslator.PCToFunc(stackAddr & 0xffffff)
+					if f == nil {
+						f = &proc.Function{Name: fmt.Sprintf("%#x", stackAddr), Entry: stackAddr}
+					}
+				}
+				stack[stackCounter] = f
+				stackCounter++
+			}
+			return stack[0:stackCounter], nil
+		},
 	}
 	reporter := &reporter{
 		goroutineQueue:         goroutineQueue,
@@ -87,12 +117,6 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 		}
 	}()
 	return func() {
-		// Don't use for-range to avoid copying the slice.
-		for i := 0; i < len(uprobeLinks); i++ {
-			if err := uprobeLinks[i].Close(); err != nil {
-				slog.Warn(err.Error())
-			}
-		}
 		if err := objs.Close(); err != nil {
 			slog.Warn("Failed to close bpf objects: %s", err)
 		}
@@ -100,11 +124,43 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 	}, nil
 }
 
-func uprobeOptions(pid int) *link.UprobeOptions {
-	if 0 < pid {
-		return &link.UprobeOptions{PID: pid}
+func linkUprobe(
+	exe *link.Executable,
+	program *ebpf.Program,
+	symbol string,
+	ret bool,
+	pid int,
+	lookupAddress func(string) uint64,
+) (link.Link, error) {
+	var l link.Link
+	var err error
+	if ret {
+		l, err = exe.Uretprobe(symbol, program, &link.UprobeOptions{PID: pid})
+	} else {
+		l, err = exe.Uprobe(symbol, program, &link.UprobeOptions{PID: pid})
 	}
-	return nil
+	if err == nil {
+		return l, nil
+	}
+	if errors.Is(err, link.ErrNoSymbol) {
+		slog.Debug("no symbol table", slog.String("symbol", symbol))
+	} else {
+		return nil, fmt.Errorf("failed to attach uprobe for %s: %w", symbol, err)
+	}
+	address := lookupAddress(symbol)
+	if address == 0 {
+		return nil, fmt.Errorf("no address found for %s", symbol)
+	}
+	if ret {
+		l, err = exe.Uretprobe(symbol, program, &link.UprobeOptions{PID: pid, Address: address})
+	} else {
+		l, err = exe.Uprobe(symbol, program, &link.UprobeOptions{PID: pid, Address: address})
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to attach uprobe for %s: %w", symbol, err)
+	}
+	slog.Debug("attach uprobe with address", slog.String("symbol", symbol), slog.String("address", fmt.Sprintf("%#x", address)))
+	return l, nil
 }
 
 func logTracePipe(done <-chan struct{}) {

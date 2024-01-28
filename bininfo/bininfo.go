@@ -1,31 +1,149 @@
 package bininfo
 
 import (
-	"encoding/binary"
+	"debug/elf"
+	"errors"
 	"fmt"
 	"log/slog"
 	"runtime"
-	"strconv"
-	"sync"
+	"sort"
 
 	"github.com/go-delve/delve/pkg/proc"
 )
 
-// BinInfo holds information on the binaries.
-type BinInfo struct {
-	mu                 sync.Mutex
-	internalBinaryInfo *proc.BinaryInfo
+// Translator translates information about an executable.
+type Translator interface {
+	// Address returns the address of the given symbol in the executable.
+	Address(symbol string) uint64
+	// Stack returns a stack trace from the given stack bytes.
+	PCToFunc(pc uint64) *proc.Function
 }
 
-// NewBinInfo will load and store the information from the binary at 'path'.
-func NewBinInfo(path string) (*BinInfo, error) {
+// NewTranslator creates a new Translator for the given executable.
+func NewTranslator(path string) (Translator, error) {
+	bi, err := newBinInfo(path)
+	if err == nil {
+		slog.Debug("loaded binary info")
+		return bi, nil
+	} else {
+		slog.Debug("failed to load binary info", slog.String("error", err.Error()))
+	}
+	s, err := newSymbolTable(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load symbol table: %w", err)
+	}
+	slog.Debug("loaded symbol table")
+	return s, nil
+}
+
+type binaryInfo struct {
+	*proc.BinaryInfo
+}
+
+func newBinInfo(path string) (*binaryInfo, error) {
 	bininfo := proc.NewBinaryInfo(runtime.GOOS, runtime.GOARCH)
 	if err := bininfo.LoadBinaryInfo(path, 0, nil); err != nil {
 		return nil, fmt.Errorf("failed to load binary info: %w", err)
 	}
-	var bi BinInfo
-	bi.internalBinaryInfo = bininfo
+	var bi binaryInfo
+	bi.BinaryInfo = bininfo
 	return &bi, nil
+}
+
+func (bi *binaryInfo) Address(symbol string) uint64 {
+	funcs, err := bi.FindFunction(symbol)
+	if err != nil {
+		return 0
+	}
+	for _, f := range funcs {
+		if f.Name == symbol {
+			return f.Entry
+		}
+	}
+	return 0
+}
+
+type symbolTable struct {
+	addresses map[string]uint64
+	functions []*proc.Function
+}
+
+// Copy from https://github.com/cilium/ebpf/blob/v0.12.3/link/uprobe.go#L116-L160
+func newSymbolTable(path string) (*symbolTable, error) {
+	f, err := elf.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	syms, err := f.Symbols()
+	if err != nil && !errors.Is(err, elf.ErrNoSymbols) {
+		return nil, err
+	}
+	dynsyms, err := f.DynamicSymbols()
+	if err != nil && !errors.Is(err, elf.ErrNoSymbols) {
+		return nil, err
+	}
+	syms = append(syms, dynsyms...)
+	if len(syms) == 0 {
+		return nil, elf.ErrNoSymbols
+	}
+	addresses := make(map[string]uint64)
+	functions := make([]*proc.Function, 0, len(syms))
+	for _, s := range syms {
+		if elf.ST_TYPE(s.Info) != elf.STT_FUNC {
+			continue
+		}
+		address := s.Value
+		for _, prog := range f.Progs {
+			if prog.Type != elf.PT_LOAD || (prog.Flags&elf.PF_X) == 0 {
+				continue
+			}
+			if prog.Vaddr <= s.Value && s.Value < (prog.Vaddr+prog.Memsz) {
+				address = s.Value - prog.Vaddr + prog.Off
+				break
+			}
+		}
+		addresses[s.Name] = address
+		index := sort.Search(len(functions), func(i int) bool { return functions[i].Entry >= address })
+		functions = append(functions, &proc.Function{})
+		copy(functions[index+1:], functions[index:])
+		functions[index] = &proc.Function{
+			Name:  s.Name,
+			Entry: address,
+		}
+	}
+	for i := 0; i < len(functions)-1; i++ {
+		functions[i].End = functions[i+1].Entry
+	}
+	return &symbolTable{
+		addresses: addresses,
+		functions: functions,
+	}, nil
+}
+
+func (s *symbolTable) Address(symbol string) uint64 {
+	if address, ok := s.addresses[symbol]; ok {
+		return address
+	}
+	return 0
+}
+
+func (s *symbolTable) PCToFunc(pc uint64) *proc.Function {
+	low := 0
+	high := len(s.functions) - 1
+
+	for low <= high {
+		mid := low + (high-low)/2
+		f := s.functions[mid]
+
+		if pc < f.Entry {
+			high = mid - 1
+		} else if pc > f.End {
+			low = mid + 1
+		} else {
+			return f
+		}
+	}
+	return nil
 }
 
 // Stack is a stack trace.
@@ -33,6 +151,9 @@ type Stack []*proc.Function
 
 // LogAttr returns a slog.Attr that can be used to log the stack.
 func (s Stack) LogAttr() slog.Attr {
+	if len(s) == 0 {
+		return slog.Attr{}
+	}
 	attrs := make([]any, len(s))
 	for i, f := range s {
 		if f == nil {
@@ -41,33 +162,4 @@ func (s Stack) LogAttr() slog.Attr {
 		attrs[i] = slog.String(fmt.Sprintf("%d", i), f.Name)
 	}
 	return slog.Group("stack", attrs...)
-}
-
-// maxStackDepth is the max depth of each stack trace to track
-// Matches 'MAX_STACK_DEPTH' in eBPF code
-const maxStackDepth = 20
-
-var stackFrameSize = (strconv.IntSize / 8)
-
-// Stack returns a stack trace from the given stack bytes.
-func (bi *BinInfo) Stack(stackBytes []byte) Stack {
-	bi.mu.Lock()
-	defer bi.mu.Unlock()
-
-	stack := make(Stack, maxStackDepth)
-	stackCounter := 0
-	for i := 0; i < len(stackBytes); i += stackFrameSize {
-		stackBytes[stackCounter] = 0
-		stackAddr := binary.LittleEndian.Uint64(stackBytes[i : i+stackFrameSize])
-		if stackAddr == 0 {
-			break
-		}
-		f := bi.internalBinaryInfo.PCToFunc(stackAddr)
-		if f == nil {
-			f = &proc.Function{Name: fmt.Sprintf("0x%x", stackAddr)}
-		}
-		stack[stackCounter] = f
-		stackCounter++
-	}
-	return stack[0:stackCounter]
 }
