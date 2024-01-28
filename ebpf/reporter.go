@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/keisku/gmon/bininfo"
+	"github.com/go-delve/delve/pkg/proc"
 )
 
 type goroutine struct {
 	Id         int64
 	ObservedAt time.Time
-	Stack      bininfo.Stack
+	Stack      []*proc.Function
 	Exit       bool
 }
 
@@ -55,7 +55,7 @@ func (r *reporter) reportGoroutineUptime() {
 		attrs := []any{
 			slog.Duration("uptime", uptime),
 			slog.Int64("goroutine_id", g.Id),
-			g.Stack.LogAttr(),
+			stackLogAttr(g.Stack),
 		}
 		if uptime > r.uptimeThreshold {
 			slog.Info("goroutine is running", attrs...)
@@ -77,7 +77,7 @@ func (r *reporter) storeGoroutine(g goroutine) {
 			slog.Duration("uptime", uptime),
 			slog.Int64("goroutine_id", g.Id),
 			// Don't use g.Stack since goexit1 doesn't have informative stack.
-			oldg.Stack.LogAttr(),
+			stackLogAttr(g.Stack),
 		}
 		if uptime > r.uptimeThreshold {
 			slog.Info("goroutine is terminated", attrs...)
@@ -90,4 +90,16 @@ func (r *reporter) storeGoroutine(g goroutine) {
 		return
 	}
 	r.goroutineMap.Store(g.Id, g)
+}
+
+// LogAttr returns a slog.Attr that can be used to log the stack.
+func stackLogAttr(stack []*proc.Function) slog.Attr {
+	attrs := make([]any, len(stack))
+	for i, f := range stack {
+		if f == nil {
+			panic("stack must not have nil function")
+		}
+		attrs[i] = slog.String(fmt.Sprintf("%d", i), f.Name)
+	}
+	return slog.Group("stack", attrs...)
 }

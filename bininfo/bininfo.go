@@ -145,21 +145,3 @@ func (s *symbolTable) PCToFunc(pc uint64) *proc.Function {
 	}
 	return nil
 }
-
-// Stack is a stack trace.
-type Stack []*proc.Function
-
-// LogAttr returns a slog.Attr that can be used to log the stack.
-func (s Stack) LogAttr() slog.Attr {
-	if len(s) == 0 {
-		return slog.Attr{}
-	}
-	attrs := make([]any, len(s))
-	for i, f := range s {
-		if f == nil {
-			panic("stack must not have nil function")
-		}
-		attrs[i] = slog.String(fmt.Sprintf("%d", i), f.Name)
-	}
-	return slog.Group("stack", attrs...)
-}
