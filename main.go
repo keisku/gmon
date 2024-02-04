@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"debug/buildinfo"
 	"flag"
 	"fmt"
 	"log"
@@ -12,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/cilium/ebpf/rlimit"
@@ -119,15 +117,10 @@ func main() {
 	if err != nil {
 		errlog.Fatalln(err)
 	}
-	buildinfoAttrs, err := loadBuildinfo(binPath)
-	if err != nil {
-		slog.Debug(err.Error())
-	}
 	slog.Debug(
 		"gmon starts",
 		slog.String("binary_path", binPath),
 		slog.String("kernel_release", kernel.Release()),
-		buildinfoAttrs,
 	)
 	if 1023 < pprofPort {
 		go func() {
@@ -139,23 +132,4 @@ func main() {
 	close(metricsQueue)
 	metricsExporter.Shutdown(context.Background())
 	eBPFClose()
-}
-
-func loadBuildinfo(binPath string) (slog.Attr, error) {
-	debugBuildinfo, err := buildinfo.ReadFile(binPath)
-	if err != nil {
-		return slog.Attr{}, fmt.Errorf("read buildinfo: %w", err)
-	}
-	args := []any{"version", debugBuildinfo.GoVersion}
-	for _, s := range debugBuildinfo.Settings {
-		if s.Value == "" {
-			continue
-		}
-		key := s.Key
-		if strings.HasPrefix(s.Key, "-") {
-			key = strings.TrimPrefix(key, "-")
-		}
-		args = append(args, []any{key, s.Value}...)
-	}
-	return slog.Group("buildinfo", args...), nil
 }
