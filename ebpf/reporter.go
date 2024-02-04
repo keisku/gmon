@@ -71,7 +71,6 @@ func (r *reporter) run(ctx context.Context) {
 				dp.SetDoubleValue(float64(uptime.Milliseconds()))
 				dp.SetStartTimestamp(pcommon.NewTimestampFromTime(g.ObservedAt))
 				dp.Attributes().PutStr("top_frame", g.topFrame())
-				dp.Attributes().PutInt("goroutine_id", g.Id)
 				return true
 			})
 			r.metircsQueue <- ms
