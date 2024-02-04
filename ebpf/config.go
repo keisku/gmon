@@ -3,6 +3,8 @@ package ebpf
 import (
 	"fmt"
 	"time"
+
+	"go.opentelemetry.io/collector/pdata/pmetric"
 )
 
 type Config struct {
@@ -10,6 +12,7 @@ type Config struct {
 	pid                    int
 	uptimeThreshold        time.Duration
 	monitorExpiryThreshold time.Duration
+	metricsQueue           chan<- pmetric.Metrics
 }
 
 func NewConfig(
@@ -17,6 +20,7 @@ func NewConfig(
 	Pid int,
 	uptimeThreshold string,
 	monitorExpiryThreshold string,
+	metricsQueue chan<- pmetric.Metrics,
 ) (Config, error) {
 	durations := make([]time.Duration, 2)
 	for i, s := range []string{uptimeThreshold, monitorExpiryThreshold} {
@@ -31,6 +35,7 @@ func NewConfig(
 		pid:                    Pid,
 		uptimeThreshold:        durations[0],
 		monitorExpiryThreshold: durations[1],
+		metricsQueue:           metricsQueue,
 	}, nil
 }
 

@@ -102,6 +102,7 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 		goroutineQueue:         goroutineQueue,
 		uptimeThreshold:        config.uptimeThreshold,
 		monitorExpiryThreshold: config.monitorExpiryThreshold,
+		metircsQueue:           config.metricsQueue,
 	}
 	go reporter.run(wrappedCtx)
 	go func() {
