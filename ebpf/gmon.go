@@ -100,7 +100,6 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 	}
 	reporter := &reporter{
 		goroutineQueue:         goroutineQueue,
-		uptimeThreshold:        config.uptimeThreshold,
 		monitorExpiryThreshold: config.monitorExpiryThreshold,
 		metircsQueue:           config.metricsQueue,
 	}

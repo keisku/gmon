@@ -39,7 +39,6 @@ func (g *goroutine) topFrame() string {
 type reporter struct {
 	goroutineQueue         <-chan goroutine
 	goroutineMap           sync.Map
-	uptimeThreshold        time.Duration
 	monitorExpiryThreshold time.Duration
 	metircsQueue           chan<- pmetric.Metrics
 	lastInt64Sum           sync.Map
@@ -68,9 +67,7 @@ func (r *reporter) run(ctx context.Context) {
 					slog.Int64("goroutine_id", g.Id),
 					stackLogAttr(g.Stack),
 				}
-				if uptime > r.uptimeThreshold {
-					slog.Info("goroutine uptime", logAttrs...)
-				}
+				slog.Info("goroutine uptime", logAttrs...)
 				dp := dps.AppendEmpty()
 				dp.SetDoubleValue(float64(uptime.Milliseconds()))
 				dp.SetStartTimestamp(pcommon.NewTimestampFromTime(g.ObservedAt))
@@ -115,9 +112,7 @@ func (r *reporter) storeGoroutine(g goroutine) {
 			// Don't use g.Stack since goexit1 doesn't have informative stack.
 			stackLogAttr(oldg.Stack),
 		}
-		if uptime > r.uptimeThreshold {
-			slog.Info("goroutine is terminated", logAttrs...)
-		}
+		slog.Info("goroutine is terminated", logAttrs...)
 		termination := sms.Metrics().AppendEmpty()
 		termination.SetName("goroutine_termination")
 		termination.SetDescription("The number of goroutines that have been terminated")

@@ -10,7 +10,6 @@ import (
 type Config struct {
 	binPath                string
 	pid                    int
-	uptimeThreshold        time.Duration
 	monitorExpiryThreshold time.Duration
 	metricsQueue           chan<- pmetric.Metrics
 }
@@ -18,12 +17,11 @@ type Config struct {
 func NewConfig(
 	binPath string,
 	Pid int,
-	uptimeThreshold string,
 	monitorExpiryThreshold string,
 	metricsQueue chan<- pmetric.Metrics,
 ) (Config, error) {
 	durations := make([]time.Duration, 2)
-	for i, s := range []string{uptimeThreshold, monitorExpiryThreshold} {
+	for i, s := range []string{monitorExpiryThreshold} {
 		d, err := time.ParseDuration(s)
 		if err != nil {
 			return Config{}, err
@@ -33,17 +31,15 @@ func NewConfig(
 	return Config{
 		binPath:                binPath,
 		pid:                    Pid,
-		uptimeThreshold:        durations[0],
-		monitorExpiryThreshold: durations[1],
+		monitorExpiryThreshold: durations[0],
 		metricsQueue:           metricsQueue,
 	}, nil
 }
 
 func (c Config) String() string {
-	return fmt.Sprintf("binPath: %s, pid: %d, uptimeThreshold: %s, monitorExpiryThreshold: %s",
+	return fmt.Sprintf("binPath: %s, pid: %d, monitorExpiryThreshold: %s",
 		c.binPath,
 		c.pid,
-		c.uptimeThreshold,
 		c.monitorExpiryThreshold,
 	)
 }

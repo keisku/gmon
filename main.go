@@ -32,7 +32,6 @@ var pid int
 var binPath string
 var pprofPort int
 var metricsPort int = 5500
-var uptimeThreshold string
 var monitorExpiryThreshold string
 
 func main() {
@@ -50,7 +49,6 @@ func main() {
 	flag.IntVar(&pprofPort, "pprof-port", pprofPort, "Port to be used for pprof server")
 	flag.IntVar(&metricsPort, "metrics-port", metricsPort, "Port to be used for metrics server, /metrics endpoint")
 	durationHelpFmt := `%s E.g., "0", "100ms", "1s500ms". See https://pkg.go.dev/time#ParseDuration`
-	flag.StringVar(&uptimeThreshold, "uptime-threshold", "0", fmt.Sprintf(durationHelpFmt, "Uptime threshold for logging."))
 	flag.StringVar(&monitorExpiryThreshold, "monitor-expiry-threshold", "0", fmt.Sprintf(durationHelpFmt, "Remove a goroutine from monitoring when its uptime exceeds this value. If set to 0, the goroutine will never be deleted."))
 	flag.Parse()
 	opts := &slog.HandlerOptions{Level: level}
@@ -106,7 +104,6 @@ func main() {
 	ebpfConfig, err := ebpf.NewConfig(
 		binPath,
 		pid,
-		uptimeThreshold,
 		monitorExpiryThreshold,
 		metricsQueue,
 	)
