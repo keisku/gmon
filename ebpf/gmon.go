@@ -99,9 +99,8 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 		},
 	}
 	reporter := &reporter{
-		goroutineQueue:         goroutineQueue,
-		monitorExpiryThreshold: config.monitorExpiryThreshold,
-		metircsQueue:           config.metricsQueue,
+		goroutineQueue: goroutineQueue,
+		metircsQueue:   config.metricsQueue,
 	}
 	go reporter.run(wrappedCtx)
 	go func() {

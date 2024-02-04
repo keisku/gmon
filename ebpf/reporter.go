@@ -37,11 +37,10 @@ func (g *goroutine) topFrame() string {
 }
 
 type reporter struct {
-	goroutineQueue         <-chan goroutine
-	goroutineMap           sync.Map
-	monitorExpiryThreshold time.Duration
-	metircsQueue           chan<- pmetric.Metrics
-	lastInt64Sum           sync.Map
+	goroutineQueue <-chan goroutine
+	goroutineMap   sync.Map
+	metircsQueue   chan<- pmetric.Metrics
+	lastInt64Sum   sync.Map
 }
 
 var reportInterval = 500 * time.Millisecond
@@ -73,10 +72,6 @@ func (r *reporter) run(ctx context.Context) {
 				dp.SetStartTimestamp(pcommon.NewTimestampFromTime(g.ObservedAt))
 				dp.Attributes().PutStr("top_frame", g.topFrame())
 				dp.Attributes().PutInt("goroutine_id", g.Id)
-				if r.monitorExpiryThreshold > 0 && uptime > r.monitorExpiryThreshold {
-					slog.Info(fmt.Sprintf("goroutine is still running after %s, then remove it from the monitoring targets", r.monitorExpiryThreshold), logAttrs...)
-					r.goroutineMap.Delete(g.Id)
-				}
 				return true
 			})
 			r.metircsQueue <- ms

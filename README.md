@@ -13,8 +13,6 @@
 Usage of gmon:
   -level value
     	log level could be one of ["DEBUG" "INFO" "WARN" "ERROR"] (default INFO)
-  -monitor-expiry-threshold string
-    	Remove a goroutine from monitoring when its uptime exceeds this value. If set to 0, the goroutine will never be deleted. E.g., "0", "100ms", "1s500ms". See https://pkg.go.dev/time#ParseDuration (default "0")
   -path string
     	Path to executable file to be monitored (required)
   -pid int
