@@ -177,7 +177,7 @@ func logTracePipe(done <-chan struct{}) {
 		for scanner.Scan() {
 			msg := strings.TrimSpace(scanner.Text())
 			if strings.Contains(msg, "gmon") {
-				slog.Debug(msg)
+				slog.Warn(msg)
 			}
 		}
 		if err := scanner.Err(); err != nil {
