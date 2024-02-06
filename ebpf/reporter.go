@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/go-delve/delve/pkg/proc"
-	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 )
 
@@ -69,7 +68,6 @@ func (r *reporter) run(ctx context.Context) {
 				slog.Info("goroutine uptime", logAttrs...)
 				dp := dps.AppendEmpty()
 				dp.SetDoubleValue(float64(uptime.Milliseconds()))
-				dp.SetStartTimestamp(pcommon.NewTimestampFromTime(g.ObservedAt))
 				dp.Attributes().PutStr("top_frame", g.topFrame())
 				return true
 			})
