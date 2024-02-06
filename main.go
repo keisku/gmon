@@ -117,7 +117,7 @@ func main() {
 	)
 	if 1023 < pprofPort {
 		go func() {
-			_ = http.ListenAndServe(fmt.Sprintf("localhost:%d", pprofPort), nil)
+			_ = http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", pprofPort), nil)
 		}()
 	}
 	<-ctx.Done()
