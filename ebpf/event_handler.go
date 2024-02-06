@@ -47,6 +47,18 @@ func (h *eventHandler) handle(
 	return nil
 }
 
+func (h *eventHandler) sendGoroutine(g goroutine) {
+	select {
+	case h.goroutineQueue <- g:
+	default:
+		slog.Warn(
+			"goroutine queue is full, dropping goroutine",
+			slog.String("goroutine_id", fmt.Sprintf("%d", g.Id)),
+			slog.String("top_frame", fmt.Sprintf("%s", g.topFrame())),
+		)
+	}
+}
+
 func (h *eventHandler) handleNewproc1() error {
 	var key bpfNewproc1EventKey
 	var value bpfNewproc1Event
@@ -64,12 +76,12 @@ func (h *eventHandler) handleNewproc1() error {
 				}
 				stackIdSet[value.StackId] = struct{}{}
 				keysToDelete = append(keysToDelete, key)
-				h.goroutineQueue <- goroutine{
+				h.sendGoroutine(goroutine{
 					Id:         key.GoroutineId,
 					ObservedAt: time.Now(),
 					Stack:      stack,
 					Exit:       false,
-				}
+				})
 			}
 			return keysToDelete, len(keysToDelete)
 		},
@@ -93,12 +105,12 @@ func (h *eventHandler) handleGoexit1() error {
 				}
 				stackIdSet[value.StackId] = struct{}{}
 				keysToDelete = append(keysToDelete, key)
-				h.goroutineQueue <- goroutine{
+				h.sendGoroutine(goroutine{
 					Id:         key.GoroutineId,
 					ObservedAt: time.Now(),
 					Stack:      stack,
 					Exit:       false,
-				}
+				})
 			}
 			return keysToDelete, len(keysToDelete)
 		},

@@ -71,7 +71,7 @@ func (r *reporter) run(ctx context.Context) {
 				dp.Attributes().PutStr("top_frame", g.topFrame())
 				return true
 			})
-			r.metircsQueue <- ms
+			r.sendMetrics(ms)
 		}
 	}()
 	for {
@@ -91,7 +91,7 @@ func (r *reporter) run(ctx context.Context) {
 func (r *reporter) storeGoroutine(g goroutine) {
 	ms := pmetric.NewMetrics()
 	defer func() {
-		r.metircsQueue <- ms
+		r.sendMetrics(ms)
 	}()
 	sms := ms.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
 	v, loaded := r.goroutineMap.Load(g.Id)
@@ -139,6 +139,14 @@ func (r *reporter) loadLastInt64Sum(key string) int64 {
 		return v.(int64)
 	}
 	return 1
+}
+
+func (r *reporter) sendMetrics(ms pmetric.Metrics) {
+	select {
+	case r.metircsQueue <- ms:
+	default:
+		slog.Warn("metrics queue is full, dropping metrics", slog.Int("len", ms.ResourceMetrics().Len()))
+	}
 }
 
 // LogAttr returns a slog.Attr that can be used to log the stack.

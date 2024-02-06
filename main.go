@@ -91,10 +91,12 @@ func main() {
 	if err := metricsExporter.Start(ctx, nil); err != nil {
 		errlog.Fatalln(fmt.Errorf("start prometheus exporter: %w", err))
 	}
-	metricsQueue := make(chan pmetric.Metrics)
+	metricsQueue := make(chan pmetric.Metrics, 50)
 	go func() {
 		for ms := range metricsQueue {
-			metricsExporter.ConsumeMetrics(ctx, ms)
+			if err := metricsExporter.ConsumeMetrics(ctx, ms); err != nil {
+				slog.Warn("consume metrics", slog.String("error", err.Error()))
+			}
 		}
 	}()
 
