@@ -60,7 +60,7 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 	if err != nil {
 		return cancel, err
 	}
-	goroutineQueue := make(chan goroutine)
+	goroutineQueue := make(chan goroutine, 100)
 	// lookupStack is a copy of the function in tracee.
 	// https://github.com/aquasecurity/tracee/blob/f61866b4e2277d2a7dddc6cd77a67cd5a5da3b14/pkg/ebpf/events_pipeline.go#L642-L681
 	const maxStackDepth = 20
