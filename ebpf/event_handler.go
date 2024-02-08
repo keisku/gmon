@@ -48,14 +48,33 @@ func (h *eventHandler) handle(
 }
 
 func (h *eventHandler) sendGoroutine(g goroutine) {
-	select {
-	case h.goroutineQueue <- g:
-	default:
-		slog.Warn(
-			"goroutine queue is full, dropping goroutine",
-			slog.String("goroutine_id", fmt.Sprintf("%d", g.Id)),
-			slog.String("top_frame", fmt.Sprintf("%s", g.topFrame())),
-		)
+	maxRetries := 3
+	retryInterval := 10 * time.Millisecond
+	for attempts := 0; attempts < maxRetries; attempts++ {
+		select {
+		case h.goroutineQueue <- g:
+			if attempts > 0 {
+				slog.Info(
+					"goroutine is sent successfully after retries",
+					slog.Int("retry", attempts+1),
+					slog.String("goroutine_id", fmt.Sprintf("%d", g.Id)),
+					slog.String("top_frame", fmt.Sprintf("%s", g.topFrame())),
+					slog.Bool("exit", g.Exit),
+				)
+			}
+			return // Successfully sent
+		default:
+			if attempts < maxRetries-1 {
+				time.Sleep(retryInterval) // Wait before retrying
+			} else {
+				slog.Warn(
+					"goroutine queue is full, retrying",
+					slog.String("goroutine_id", fmt.Sprintf("%d", g.Id)),
+					slog.String("top_frame", fmt.Sprintf("%s", g.topFrame())),
+					slog.Bool("exit", g.Exit),
+				)
+			}
+		}
 	}
 }
 
