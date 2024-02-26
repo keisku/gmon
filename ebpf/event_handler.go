@@ -58,7 +58,7 @@ func (h *eventHandler) sendGoroutine(g goroutine) {
 					"goroutine is sent successfully after retries",
 					slog.Int("retry", attempts+1),
 					slog.String("goroutine_id", fmt.Sprintf("%d", g.Id)),
-					slog.String("top_frame", fmt.Sprintf("%s", g.topFrame())),
+					slog.String("top_frame", g.topFrame()),
 					slog.Bool("exit", g.Exit),
 				)
 			}
@@ -70,7 +70,7 @@ func (h *eventHandler) sendGoroutine(g goroutine) {
 				slog.Warn(
 					"goroutine queue is full, retrying",
 					slog.String("goroutine_id", fmt.Sprintf("%d", g.Id)),
-					slog.String("top_frame", fmt.Sprintf("%s", g.topFrame())),
+					slog.String("top_frame", g.topFrame()),
 					slog.Bool("exit", g.Exit),
 				)
 			}
