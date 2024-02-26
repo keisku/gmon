@@ -16,6 +16,7 @@ generate:
 	go generate -x ./...
 
 format:
+	staticcheck ./...
 	find . -type f \( -name '*.[ch]' -and -not -name 'vmlinux.h' \) -exec clang-format -i {} \;
 
 test:
@@ -26,3 +27,4 @@ tool-version:
 	bpftool --version
 	clang --version
 	go version
+	staticcheck --version
