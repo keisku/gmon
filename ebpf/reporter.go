@@ -46,32 +46,36 @@ var reportInterval = 500 * time.Millisecond
 
 func (r *reporter) run(ctx context.Context) {
 	go func() {
-		for range time.Tick(reportInterval) {
-			if err := ctx.Err(); err != nil {
+		ticker := time.NewTicker(reportInterval)
+		for {
+			select {
+			case <-ctx.Done():
+				ticker.Stop()
 				return
+			case <-ticker.C:
+				ms := pmetric.NewMetrics()
+				sms := ms.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
+				m := sms.Metrics().AppendEmpty()
+				m.SetName("goroutine_uptime")
+				m.SetDescription("Milliseconds since the goroutine was created")
+				m.SetUnit("milliseconds")
+				dps := m.SetEmptyGauge().DataPoints()
+				r.goroutineMap.Range(func(_, value any) bool {
+					g := value.(goroutine)
+					uptime := time.Since(g.ObservedAt)
+					logAttrs := []any{
+						slog.Duration("uptime", uptime),
+						slog.Int64("goroutine_id", g.Id),
+						stackLogAttr(g.Stack),
+					}
+					slog.Info("goroutine uptime", logAttrs...)
+					dp := dps.AppendEmpty()
+					dp.SetDoubleValue(float64(uptime.Milliseconds()))
+					dp.Attributes().PutStr("top_frame", g.topFrame())
+					return true
+				})
+				r.sendMetrics(ms)
 			}
-			ms := pmetric.NewMetrics()
-			sms := ms.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
-			m := sms.Metrics().AppendEmpty()
-			m.SetName("goroutine_uptime")
-			m.SetDescription("Milliseconds since the goroutine was created")
-			m.SetUnit("milliseconds")
-			dps := m.SetEmptyGauge().DataPoints()
-			r.goroutineMap.Range(func(_, value any) bool {
-				g := value.(goroutine)
-				uptime := time.Since(g.ObservedAt)
-				logAttrs := []any{
-					slog.Duration("uptime", uptime),
-					slog.Int64("goroutine_id", g.Id),
-					stackLogAttr(g.Stack),
-				}
-				slog.Info("goroutine uptime", logAttrs...)
-				dp := dps.AppendEmpty()
-				dp.SetDoubleValue(float64(uptime.Milliseconds()))
-				dp.Attributes().PutStr("top_frame", g.topFrame())
-				return true
-			})
-			r.sendMetrics(ms)
 		}
 	}()
 	for {

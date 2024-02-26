@@ -104,12 +104,14 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 	}
 	go reporter.run(wrappedCtx)
 	go func() {
+		ticker := time.NewTicker(200 * time.Millisecond)
 		for {
 			select {
 			case <-wrappedCtx.Done():
 				slog.Debug("eBPF programs stop")
+				ticker.Stop()
 				return
-			case <-time.Tick(200 * time.Millisecond):
+			case <-ticker.C:
 				eventhandler.handleNewproc1()
 				eventhandler.handleGoexit1()
 			}
