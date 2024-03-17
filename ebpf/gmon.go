@@ -22,21 +22,20 @@ import (
 // $BPF_CLANG and $BPF_CFLAGS are set by the Makefile.
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -target amd64 -cflags $BPF_CFLAGS bpf ./c/gmon.c -- -I./c
 
-func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
+func Run(ctx context.Context, config Config) (func(), error) {
 	slog.Debug("eBPF programs start with config", slog.String("config", config.String()))
-	wrappedCtx, cancel := context.WithCancel(ctx)
 	objs := bpfObjects{}
 	if err := loadBpfObjects(&objs, nil); err != nil {
-		return cancel, err
+		return func() {}, err
 	}
 	biTranslator, err := bininfo.NewTranslator(config.binPath)
 	if err != nil {
-		return cancel, err
+		return func() {}, err
 	}
-	go logTracePipe(wrappedCtx.Done())
+	go logTracePipe(ctx.Done())
 	ex, err := link.OpenExecutable(config.binPath)
 	if err != nil {
-		return cancel, err
+		return func() {}, err
 	}
 	_, err = linkUprobe(
 		ex,
@@ -47,7 +46,7 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 		biTranslator.Address,
 	)
 	if err != nil {
-		return cancel, err
+		return func() {}, err
 	}
 	_, err = linkUprobe(
 		ex,
@@ -58,7 +57,7 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 		biTranslator.Address,
 	)
 	if err != nil {
-		return cancel, err
+		return func() {}, err
 	}
 	goroutineQueue := make(chan goroutine, 100)
 	// lookupStack is a copy of the function in tracee.
@@ -102,12 +101,12 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 		goroutineQueue: goroutineQueue,
 		metircsQueue:   config.metricsQueue,
 	}
-	go reporter.run(wrappedCtx)
+	go reporter.run(ctx)
 	go func() {
 		ticker := time.NewTicker(200 * time.Millisecond)
 		for {
 			select {
-			case <-wrappedCtx.Done():
+			case <-ctx.Done():
 				slog.Debug("eBPF programs stop")
 				ticker.Stop()
 				return
@@ -121,7 +120,6 @@ func Run(ctx context.Context, config Config) (context.CancelFunc, error) {
 		if err := objs.Close(); err != nil {
 			slog.Warn("Failed to close bpf objects: %s", err)
 		}
-		cancel()
 	}, nil
 }
 
