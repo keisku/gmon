@@ -3,19 +3,15 @@ package ebpf
 import (
 	"bufio"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
-	"github.com/go-delve/delve/pkg/proc"
 	"github.com/keisku/gmon/bininfo"
 )
 
@@ -60,62 +56,17 @@ func Run(ctx context.Context, config Config) (func(), error) {
 		return func() {}, err
 	}
 	goroutineQueue := make(chan goroutine, 100)
-	// lookupStack is a copy of the function in tracee.
-	// https://github.com/aquasecurity/tracee/blob/f61866b4e2277d2a7dddc6cd77a67cd5a5da3b14/pkg/ebpf/events_pipeline.go#L642-L681
-	const maxStackDepth = 20
-	var stackFrameSize = (strconv.IntSize / 8)
 	eventhandler := &eventHandler{
 		goroutineQueue: goroutineQueue,
 		objs:           &objs,
-		lookupStack: func(id int32) ([]*proc.Function, error) {
-			stackBytes, err := objs.StackAddresses.LookupBytes(id)
-			if err != nil {
-				return nil, fmt.Errorf("failed to lookup stack address: %w", err)
-			}
-			stack := make([]*proc.Function, maxStackDepth)
-			stackCounter := 0
-			for i := 0; i < len(stackBytes); i += stackFrameSize {
-				stackBytes[stackCounter] = 0
-				stackAddr := binary.LittleEndian.Uint64(stackBytes[i : i+stackFrameSize])
-				if stackAddr == 0 {
-					break
-				}
-				f := biTranslator.PCToFunc(stackAddr)
-				if f == nil {
-					// I don't know why, but a function address sometime should be last 3 bytes.
-					// At leaset, I observerd this behavior in the following binaries:
-					// - /usr/bin/dockerd
-					// - /usr/bin/containerd
-					f = biTranslator.PCToFunc(stackAddr & 0xffffff)
-					if f == nil {
-						f = &proc.Function{Name: fmt.Sprintf("%#x", stackAddr), Entry: stackAddr}
-					}
-				}
-				stack[stackCounter] = f
-				stackCounter++
-			}
-			return stack[0:stackCounter], nil
-		},
+		biTranslator:   biTranslator,
 	}
 	reporter := &reporter{
 		goroutineQueue: goroutineQueue,
 		metircsQueue:   config.metricsQueue,
 	}
 	go reporter.run(ctx)
-	go func() {
-		ticker := time.NewTicker(200 * time.Millisecond)
-		for {
-			select {
-			case <-ctx.Done():
-				slog.Debug("eBPF programs stop")
-				ticker.Stop()
-				return
-			case <-ticker.C:
-				eventhandler.handleNewproc1(ctx)
-				eventhandler.handleGoexit1(ctx)
-			}
-		}
-	}()
+	go eventhandler.run(ctx)
 	return func() {
 		if err := objs.Close(); err != nil {
 			slog.Warn("Failed to close bpf objects: %s", err)

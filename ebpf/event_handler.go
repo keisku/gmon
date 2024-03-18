@@ -2,31 +2,94 @@ package ebpf
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log/slog"
 	"runtime/trace"
+	"strconv"
 	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/go-delve/delve/pkg/proc"
+	"github.com/keisku/gmon/bininfo"
 )
 
 type eventHandler struct {
-	lookupStack    func(int32) ([]*proc.Function, error)
 	goroutineQueue chan<- goroutine
 	objs           *bpfObjects
+	biTranslator   bininfo.Translator
+}
+
+func (h *eventHandler) run(ctx context.Context) {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	for {
+		select {
+		case <-ctx.Done():
+			ticker.Stop()
+			return
+		case <-ticker.C:
+			ctx, task := trace.NewTask(ctx, "event_handler.handle")
+			trace.WithRegion(ctx, "event_handler.handle_newproc1", func() {
+				if err := h.handleNewproc1(); err != nil {
+					slog.Warn("Failed to handle newproc1", slog.Any("error", err))
+				}
+			})
+			trace.WithRegion(ctx, "event_handler.handle_goexit1", func() {
+				if err := h.handleGoexit1(); err != nil {
+					slog.Warn("Failed to handle goexit1", slog.Any("error", err))
+				}
+			})
+			task.End()
+		}
+	}
+}
+
+// lookupStack is a copy of the function in tracee.
+// https://github.com/aquasecurity/tracee/blob/f61866b4e2277d2a7dddc6cd77a67cd5a5da3b14/pkg/ebpf/events_pipeline.go#L642-L681
+const maxStackDepth = 20
+
+var stackFrameSize = (strconv.IntSize / 8)
+
+func (h *eventHandler) lookupStack(stackId int32) ([]*proc.Function, error) {
+	stackBytes, err := h.objs.StackAddresses.LookupBytes(stackId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup stack addresses: %w", err)
+	}
+	if stackBytes == nil {
+		return nil, fmt.Errorf("bytes not found by stack_id=%d", stackId)
+	}
+	stack := make([]*proc.Function, maxStackDepth)
+	stackCounter := 0
+	for i := 0; i < len(stackBytes); i += stackFrameSize {
+		stackBytes[stackCounter] = 0
+		stackAddr := binary.LittleEndian.Uint64(stackBytes[i : i+stackFrameSize])
+		if stackAddr == 0 {
+			break
+		}
+		f := h.biTranslator.PCToFunc(stackAddr)
+		if f == nil {
+			// I don't know why, but a function address sometime should be last 3 bytes.
+			// At leaset, I observerd this behavior in the following binaries:
+			// - /usr/bin/dockerd
+			// - /usr/bin/containerd
+			f = h.biTranslator.PCToFunc(stackAddr & 0xffffff)
+			if f == nil {
+				f = &proc.Function{Name: fmt.Sprintf("%#x", stackAddr), Entry: stackAddr}
+			}
+		}
+		stack[stackCounter] = f
+		stackCounter++
+	}
+	return stack[0:stackCounter], nil
 }
 
 func (h *eventHandler) handle(
-	ctx context.Context,
 	stackAddrs, eventMap *ebpf.Map,
 	// stackIdSet is the set of stack_id to delete later.
 	// keysToDelete is the slice of eBPF map keys to delete later.
 	// keyLength holds the count of keys in keysToDelete to determine if BatchDelete is required.
 	processMap func(iter *ebpf.MapIterator, stackIdSet map[int32]struct{}) (keysToDelete any, keyLength int),
 ) error {
-	defer trace.StartRegion(ctx, "event_handler.handle").End()
-
 	stackIdSetToDelete := make(map[int32]struct{})
 	mapIter := eventMap.Iterate()
 	keysToDelete, keyLength := processMap(mapIter, stackIdSetToDelete)
@@ -83,16 +146,12 @@ func (h *eventHandler) sendGoroutine(g goroutine) {
 	}
 }
 
-func (h *eventHandler) handleNewproc1(ctx context.Context) error {
-	ctx, task := trace.NewTask(ctx, "event_handler.handle_newproc1")
-	defer task.End()
-
+func (h *eventHandler) handleNewproc1() error {
 	var key bpfNewproc1EventKey
 	var value bpfNewproc1Event
 	var keysToDelete []bpfNewproc1EventKey
 
 	return h.handle(
-		ctx,
 		h.objs.StackAddresses,
 		h.objs.Newproc1Events,
 		func(mapIter *ebpf.MapIterator, stackIdSet map[int32]struct{}) (any, int) {
@@ -116,16 +175,12 @@ func (h *eventHandler) handleNewproc1(ctx context.Context) error {
 	)
 }
 
-func (h *eventHandler) handleGoexit1(ctx context.Context) error {
-	ctx, task := trace.NewTask(ctx, "event_handler.handle_goexit1")
-	defer task.End()
-
+func (h *eventHandler) handleGoexit1() error {
 	var key bpfGoexit1EventKey
 	var value bpfGoexit1Event
 	var keysToDelete []bpfGoexit1EventKey
 
 	return h.handle(
-		ctx,
 		h.objs.StackAddresses,
 		h.objs.Goexit1Events,
 		func(mapIter *ebpf.MapIterator, stackIdSet map[int32]struct{}) (any, int) {
