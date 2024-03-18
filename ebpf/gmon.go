@@ -111,8 +111,8 @@ func Run(ctx context.Context, config Config) (func(), error) {
 				ticker.Stop()
 				return
 			case <-ticker.C:
-				eventhandler.handleNewproc1()
-				eventhandler.handleGoexit1()
+				eventhandler.handleNewproc1(ctx)
+				eventhandler.handleGoexit1(ctx)
 			}
 		}
 	}()

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/trace"
 	"time"
 
 	"github.com/cilium/ebpf/rlimit"
@@ -30,6 +31,7 @@ import (
 var level slog.Level
 var pid int
 var binPath string
+var traceOutPath string
 var pprofPort int
 var metricsPort int = 5500
 
@@ -42,6 +44,7 @@ func main() {
 	}
 
 	flag.StringVar(&binPath, "path", binPath, "Path to executable file to be monitored (required)")
+	flag.StringVar(&traceOutPath, "trace", "/tmp/gmon-trace.out", "File path to trace output")
 	flag.TextVar(&level, "level", level, fmt.Sprintf("log level could be one of %q",
 		[]slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError}))
 	flag.IntVar(&pid, "pid", pid, "Useful when tracing programs that have many running instances")
@@ -50,6 +53,14 @@ func main() {
 	flag.Parse()
 	opts := &slog.HandlerOptions{Level: level}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, opts)))
+
+	traceOutFile, err := os.Create(traceOutPath)
+	if err != nil {
+		errlog.Fatalln(err)
+	}
+	if err := trace.Start(traceOutFile); err != nil {
+		errlog.Fatalln(err)
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer cancel()

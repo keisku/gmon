@@ -1,8 +1,10 @@
 package ebpf
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"runtime/trace"
 	"time"
 
 	"github.com/cilium/ebpf"
@@ -16,12 +18,15 @@ type eventHandler struct {
 }
 
 func (h *eventHandler) handle(
+	ctx context.Context,
 	stackAddrs, eventMap *ebpf.Map,
 	// stackIdSet is the set of stack_id to delete later.
 	// keysToDelete is the slice of eBPF map keys to delete later.
 	// keyLength holds the count of keys in keysToDelete to determine if BatchDelete is required.
 	processMap func(iter *ebpf.MapIterator, stackIdSet map[int32]struct{}) (keysToDelete any, keyLength int),
 ) error {
+	defer trace.StartRegion(ctx, "event_handler.handle").End()
+
 	stackIdSetToDelete := make(map[int32]struct{})
 	mapIter := eventMap.Iterate()
 	keysToDelete, keyLength := processMap(mapIter, stackIdSetToDelete)
@@ -78,12 +83,16 @@ func (h *eventHandler) sendGoroutine(g goroutine) {
 	}
 }
 
-func (h *eventHandler) handleNewproc1() error {
+func (h *eventHandler) handleNewproc1(ctx context.Context) error {
+	ctx, task := trace.NewTask(ctx, "event_handler.handle_newproc1")
+	defer task.End()
+
 	var key bpfNewproc1EventKey
 	var value bpfNewproc1Event
 	var keysToDelete []bpfNewproc1EventKey
 
 	return h.handle(
+		ctx,
 		h.objs.StackAddresses,
 		h.objs.Newproc1Events,
 		func(mapIter *ebpf.MapIterator, stackIdSet map[int32]struct{}) (any, int) {
@@ -107,12 +116,16 @@ func (h *eventHandler) handleNewproc1() error {
 	)
 }
 
-func (h *eventHandler) handleGoexit1() error {
+func (h *eventHandler) handleGoexit1(ctx context.Context) error {
+	ctx, task := trace.NewTask(ctx, "event_handler.handle_goexit1")
+	defer task.End()
+
 	var key bpfGoexit1EventKey
 	var value bpfGoexit1Event
 	var keysToDelete []bpfGoexit1EventKey
 
 	return h.handle(
+		ctx,
 		h.objs.StackAddresses,
 		h.objs.Goexit1Events,
 		func(mapIter *ebpf.MapIterator, stackIdSet map[int32]struct{}) (any, int) {

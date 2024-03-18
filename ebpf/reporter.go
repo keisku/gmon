@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime/trace"
 	"sync"
 	"time"
 
@@ -53,6 +54,7 @@ func (r *reporter) run(ctx context.Context) {
 				ticker.Stop()
 				return
 			case <-ticker.C:
+				ctx, task := trace.NewTask(ctx, "reporter.send_metrics")
 				ms := pmetric.NewMetrics()
 				sms := ms.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
 				m := sms.Metrics().AppendEmpty()
@@ -60,21 +62,24 @@ func (r *reporter) run(ctx context.Context) {
 				m.SetDescription("Milliseconds since the goroutine was created")
 				m.SetUnit("milliseconds")
 				dps := m.SetEmptyGauge().DataPoints()
-				r.goroutineMap.Range(func(_, value any) bool {
-					g := value.(goroutine)
-					uptime := time.Since(g.ObservedAt)
-					logAttrs := []any{
-						slog.Duration("uptime", uptime),
-						slog.Int64("goroutine_id", g.Id),
-						stackLogAttr(g.Stack),
-					}
-					slog.Info("goroutine uptime", logAttrs...)
-					dp := dps.AppendEmpty()
-					dp.SetDoubleValue(float64(uptime.Milliseconds()))
-					dp.Attributes().PutStr("top_frame", g.topFrame())
-					return true
+				trace.WithRegion(ctx, "reporter.send_metrics.iterate_goroutine_map", func() {
+					r.goroutineMap.Range(func(_, value any) bool {
+						g := value.(goroutine)
+						uptime := time.Since(g.ObservedAt)
+						logAttrs := []any{
+							slog.Duration("uptime", uptime),
+							slog.Int64("goroutine_id", g.Id),
+							stackLogAttr(g.Stack),
+						}
+						slog.Info("goroutine uptime", logAttrs...)
+						dp := dps.AppendEmpty()
+						dp.SetDoubleValue(float64(uptime.Milliseconds()))
+						dp.Attributes().PutStr("top_frame", g.topFrame())
+						return true
+					})
 				})
 				r.sendMetrics(ms)
+				task.End()
 			}
 		}
 	}()
@@ -83,11 +88,15 @@ func (r *reporter) run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case g, ok := <-r.goroutineQueue:
+			ctx, task := trace.NewTask(ctx, "reporter.store_goroutine")
 			if !ok {
 				slog.Debug("goroutineQueue closed")
 				return
 			}
-			r.storeGoroutine(g)
+			trace.WithRegion(ctx, "reporter.store_goroutine", func() {
+				r.storeGoroutine(g)
+			})
+			task.End()
 		}
 	}
 }
