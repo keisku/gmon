@@ -21,6 +21,10 @@ type goroutine struct {
 
 // topFunctionName returns the name of the top function in the stack.
 func (g *goroutine) topFrame() string {
+	if len(g.Stack) == 0 {
+		slog.Debug("goroutine stack is empty", slog.Int64("goroutine_id", g.Id), slog.Bool("exit", g.Exit))
+		return ""
+	}
 	f := g.Stack[len(g.Stack)-1]
 	if f == nil {
 		return ""
