@@ -106,7 +106,7 @@ func main() {
 	go func() {
 		for ms := range metricsQueue {
 			if err := metricsExporter.ConsumeMetrics(ctx, ms); err != nil {
-				slog.Warn("consume metrics", slog.String("error", err.Error()))
+				slog.Warn("consume metrics", slog.Any("error", err))
 			}
 		}
 	}()

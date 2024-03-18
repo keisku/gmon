@@ -26,7 +26,7 @@ func NewTranslator(path string) (Translator, error) {
 		slog.Debug("loaded binary info")
 		return bi, nil
 	} else {
-		slog.Debug("failed to load binary info", slog.String("error", err.Error()))
+		slog.Debug("failed to load binary info", slog.Any("error", err))
 	}
 	s, err := newSymbolTable(path)
 	if err != nil {

@@ -165,7 +165,7 @@ func linkUprobe(
 func logTracePipe(done <-chan struct{}) {
 	tracePipe, err := os.Open("/sys/kernel/debug/tracing/trace_pipe")
 	if err != nil {
-		slog.Error("open trace_pipe", slog.String("error", err.Error()))
+		slog.Error("open trace_pipe", slog.Any("error", err))
 		return
 	}
 	defer tracePipe.Close()
@@ -182,7 +182,7 @@ func logTracePipe(done <-chan struct{}) {
 		}
 		if err := scanner.Err(); err != nil {
 			if !errors.Is(err, fs.ErrClosed) {
-				slog.Error("read trace_pipe", slog.String("error", err.Error()))
+				slog.Error("read trace_pipe", slog.Any("error", err))
 			}
 		}
 	}()

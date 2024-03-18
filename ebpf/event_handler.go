@@ -37,14 +37,14 @@ func (h *eventHandler) handle(
 		if n, err := eventMap.BatchDelete(keysToDelete, nil); err == nil {
 			slog.Debug("Deleted eBPF map", slog.Int("deleted", n), slog.Int("expected", keyLength))
 		} else {
-			slog.Warn("Failed to delete eBPF map", slog.String("error", err.Error()))
+			slog.Warn("Failed to delete eBPF map", slog.Any("err", err))
 		}
 	}
 	// Don't use BatchDelete for stack addresses because the opration is not supported.
 	// If we do it, we will see "batch delete: not supported" error.
 	for stackId := range stackIdSetToDelete {
 		if err := stackAddrs.Delete(stackId); err != nil {
-			slog.Warn("Failed to delete stack_addresses", slog.String("error", err.Error()))
+			slog.Debug("Failed to delete stack_addresses", slog.Any("error", err))
 			continue
 		}
 		slog.Debug("Deleted stack address map", slog.Int("stack_id", int(stackId)))
