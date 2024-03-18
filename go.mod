@@ -1,10 +1,10 @@
 module github.com/keisku/gmon
 
-go 1.21.6
+go 1.22.1
 
 require (
 	github.com/cilium/ebpf v0.12.3
-	github.com/go-delve/delve v1.21.0 // Pinning to v1.21.0 to avoid https://github.com/go-delve/delve/issues/3650
+	github.com/go-delve/delve v1.22.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.93.0
 	github.com/stretchr/testify v1.8.4
 	go.opentelemetry.io/collector/component v0.93.0
