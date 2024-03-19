@@ -50,62 +50,58 @@ type reporter struct {
 var reportInterval = 500 * time.Millisecond
 
 func (r *reporter) run(ctx context.Context) {
-	go func() {
-		ticker := time.NewTicker(reportInterval)
-		for {
-			select {
-			case <-ctx.Done():
-				ticker.Stop()
-				return
-			case <-ticker.C:
-				ctx, task := trace.NewTask(ctx, "reporter.send_metrics")
-				ms := pmetric.NewMetrics()
-				sms := ms.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
-				m := sms.Metrics().AppendEmpty()
-				m.SetName("goroutine_uptime")
-				m.SetDescription("Milliseconds since the goroutine was created")
-				m.SetUnit("milliseconds")
-				dps := m.SetEmptyGauge().DataPoints()
-				trace.WithRegion(ctx, "reporter.send_metrics.iterate_goroutine_map", func() {
-					r.goroutineMap.Range(func(_, value any) bool {
-						g := value.(goroutine)
-						uptime := time.Since(g.ObservedAt)
-						logAttrs := []any{
-							slog.Duration("uptime", uptime),
-							slog.Int64("goroutine_id", g.Id),
-							stackLogAttr(g.Stack),
-						}
-						slog.Info("goroutine uptime", logAttrs...)
-						dp := dps.AppendEmpty()
-						dp.SetDoubleValue(float64(uptime.Milliseconds()))
-						dp.Attributes().PutStr("top_frame", g.topFrame())
-						return true
-					})
-				})
-				r.sendMetrics(ms)
-				task.End()
-			}
-		}
-	}()
+	go r.submitMetricsPeriodically(ctx)
+	go r.subscribe(ctx)
+	<-ctx.Done()
+}
+
+func (r *reporter) submitMetricsPeriodically(ctx context.Context) {
+	ticker := time.NewTicker(reportInterval)
 	for {
 		select {
 		case <-ctx.Done():
+			ticker.Stop()
 			return
-		case g, ok := <-r.goroutineQueue:
-			ctx, task := trace.NewTask(ctx, "reporter.store_goroutine")
-			if !ok {
-				slog.Debug("goroutineQueue closed")
-				return
-			}
-			trace.WithRegion(ctx, "reporter.store_goroutine", func() {
-				r.storeGoroutine(g)
+		case <-ticker.C:
+			ctx, task := trace.NewTask(ctx, "reporter.record_goroutine_uptime")
+			ms := pmetric.NewMetrics()
+			sms := ms.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
+			m := sms.Metrics().AppendEmpty()
+			m.SetName("goroutine_uptime")
+			m.SetDescription("Milliseconds since the goroutine was created")
+			m.SetUnit("milliseconds")
+			dps := m.SetEmptyGauge().DataPoints()
+			trace.WithRegion(ctx, "reporter.send_metrics.iterate_goroutine_map", func() {
+				r.goroutineMap.Range(func(_, value any) bool {
+					g := value.(goroutine)
+					uptime := time.Since(g.ObservedAt)
+					logAttrs := []any{
+						slog.Duration("uptime", uptime),
+						slog.Int64("goroutine_id", g.Id),
+						stackLogAttr(g.Stack),
+					}
+					slog.Info("goroutine uptime", logAttrs...)
+					dp := dps.AppendEmpty()
+					dp.SetDoubleValue(float64(uptime.Milliseconds()))
+					dp.Attributes().PutStr("top_frame", g.topFrame())
+					return true
+				})
 			})
+			r.sendMetrics(ms)
 			task.End()
 		}
 	}
 }
 
-func (r *reporter) storeGoroutine(g goroutine) {
+func (r *reporter) subscribe(ctx context.Context) {
+	for g := range r.goroutineQueue {
+		ctx, task := trace.NewTask(ctx, "reporter.store_goroutine")
+		r.storeGoroutine(ctx, g)
+		task.End()
+	}
+}
+
+func (r *reporter) storeGoroutine(ctx context.Context, g goroutine) {
 	ms := pmetric.NewMetrics()
 	defer func() {
 		r.sendMetrics(ms)
@@ -113,6 +109,7 @@ func (r *reporter) storeGoroutine(g goroutine) {
 	sms := ms.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
 	v, loaded := r.goroutineMap.Load(g.Id)
 	if loaded {
+		_, task := trace.NewTask(ctx, "reporter.store_exit_goroutine")
 		oldg := v.(goroutine)
 		uptime := time.Since(oldg.ObservedAt)
 		logAttrs := []any{
@@ -132,12 +129,14 @@ func (r *reporter) storeGoroutine(g goroutine) {
 		terminationSumDp.SetIntValue(r.loadLastInt64Sum(fmt.Sprintf("termination_%s", oldg.topFrame())))
 		terminationSumDp.Attributes().PutStr("top_frame", oldg.topFrame())
 		r.goroutineMap.Delete(oldg.Id)
+		task.End()
 		return
 	}
 	if g.Exit {
 		// Avoid storing goroutines that lack a corresponding newproc1 pair.
 		return
 	}
+	_, task := trace.NewTask(ctx, "reporter.store_new_goroutine")
 	creation := sms.Metrics().AppendEmpty()
 	creation.SetName("goroutine_creation")
 	creation.SetDescription("The number of goroutines that have been created")
@@ -148,6 +147,7 @@ func (r *reporter) storeGoroutine(g goroutine) {
 	creationSumDp.SetIntValue(r.loadLastInt64Sum(fmt.Sprintf("creation_%s", g.topFrame())))
 	creationSumDp.Attributes().PutStr("top_frame", g.topFrame())
 	r.goroutineMap.Store(g.Id, g)
+	task.End()
 }
 
 func (r *reporter) loadLastInt64Sum(key string) int64 {
