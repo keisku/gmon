@@ -33,7 +33,8 @@ func Run(ctx context.Context, config Config) (func(), error) {
 	if err != nil {
 		return func() {}, err
 	}
-	_, err = linkUprobe(
+	var links [2]link.Link
+	links[0], err = linkUprobe(
 		ex,
 		objs.RuntimeNewproc1,
 		"runtime.newproc1",
@@ -44,7 +45,7 @@ func Run(ctx context.Context, config Config) (func(), error) {
 	if err != nil {
 		return func() {}, err
 	}
-	_, err = linkUprobe(
+	links[1], err = linkUprobe(
 		ex,
 		objs.RuntimeGoexit1,
 		"runtime.goexit1",
@@ -68,6 +69,11 @@ func Run(ctx context.Context, config Config) (func(), error) {
 	go reporter.run(ctx)
 	go eventhandler.run(ctx)
 	return func() {
+		for i := range links {
+			if err := links[i].Close(); err != nil {
+				slog.Warn("Failed to close link", slog.Any("error", err))
+			}
+		}
 		if err := objs.Close(); err != nil {
 			slog.Warn("Failed to close bpf objects: %s", err)
 		}
