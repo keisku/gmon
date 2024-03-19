@@ -12,20 +12,12 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/trace"
-	"time"
 
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/keisku/gmon/ebpf"
 	"github.com/keisku/gmon/kernel"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter"
-	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/config/confighttp"
-	"go.opentelemetry.io/collector/exporter"
-	"go.opentelemetry.io/collector/pdata/pmetric"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/zap"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -52,12 +44,17 @@ var (
 	metricsPort  = flag.Int("metrics", 5500, "Port to be used for metrics server, /metrics endpoint")
 )
 
+type promLogger struct{}
+
+func (promLogger) Println(v ...interface{}) {
+	slog.Error(fmt.Sprint(v...))
+}
+
 func main() {
 	flag.Parse()
 	opts := &slog.HandlerOptions{Level: levelMap[*level]}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, opts)))
 	errlog := log.New(os.Stderr, "", log.LstdFlags)
-	prometheusexporterLogger, _ := zap.NewProduction()
 
 	if runtime.GOARCH != "amd64" || runtime.GOOS != "linux" {
 		errlog.Fatalln("gmon only works on amd64 Linux")
@@ -78,52 +75,18 @@ func main() {
 		errlog.Fatalln(err)
 	}
 
-	meterProvider := metric.NewMeterProvider()
-	otel.SetMeterProvider(meterProvider)
-	prometheusexporterFactory := prometheusexporter.NewFactory()
-	metricsExporter, err := prometheusexporterFactory.CreateMetricsExporter(
-		ctx,
-		exporter.CreateSettings{
-			ID: component.NewID(component.DataTypeMetrics),
-			TelemetrySettings: component.TelemetrySettings{
-				Logger:         prometheusexporterLogger,
-				MeterProvider:  meterProvider,
-				TracerProvider: noop.NewTracerProvider(),
-			},
-			BuildInfo: component.BuildInfo{
-				Command:     "gmon",
-				Description: "Goroutine monitor for Go programs",
-				Version:     "0.0.0-dev",
-			},
-		},
-		&prometheusexporter.Config{
-			HTTPServerSettings: confighttp.HTTPServerSettings{
-				Endpoint: fmt.Sprintf("127.0.0.1:%d", *metricsPort),
-			},
-			Namespace:         "gmon",
+	http.Handle("/metrics", promhttp.HandlerFor(
+		prometheus.DefaultGatherer,
+		promhttp.HandlerOpts{
+			ErrorLog:          promLogger{},
 			EnableOpenMetrics: true,
-			MetricExpiration:  time.Minute,
 		},
-	)
-	if err != nil {
-		errlog.Fatalln(fmt.Errorf("create prometheus exporter: %w", err))
-	}
-	if err := metricsExporter.Start(ctx, nil); err != nil {
-		errlog.Fatalln(fmt.Errorf("start prometheus exporter: %w", err))
-	}
-	metricsQueue := make(chan pmetric.Metrics, 50)
-	go func() {
-		for ms := range metricsQueue {
-			if err := metricsExporter.ConsumeMetrics(ctx, ms); err != nil {
-				slog.Warn("consume metrics", slog.Any("error", err))
-			}
-		}
-	}()
+	))
+	go http.ListenAndServe(fmt.Sprintf(":%d", *metricsPort), nil)
 
 	ebpfConfig, err := ebpf.NewConfig(
 		*binPath,
 		*pid,
-		metricsQueue,
 	)
 	if err != nil {
 		errlog.Fatalln(err)
@@ -144,7 +107,5 @@ func main() {
 	}
 	<-ctx.Done()
 	slog.Debug("gmon exits")
-	close(metricsQueue)
-	metricsExporter.Shutdown(context.Background())
 	eBPFClose()
 }

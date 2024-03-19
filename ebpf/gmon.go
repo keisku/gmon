@@ -64,7 +64,6 @@ func Run(ctx context.Context, config Config) (func(), error) {
 	}
 	reporter := &reporter{
 		goroutineQueue: goroutineQueue,
-		metircsQueue:   config.metricsQueue,
 	}
 	go reporter.run(ctx)
 	go eventhandler.run(ctx)
