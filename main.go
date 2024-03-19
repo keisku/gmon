@@ -15,7 +15,6 @@ import (
 
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/keisku/gmon/ebpf"
-	"github.com/keisku/gmon/kernel"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -95,11 +94,6 @@ func main() {
 	if err != nil {
 		errlog.Fatalln(err)
 	}
-	slog.Debug(
-		"gmon starts",
-		slog.String("binary_path", *binPath),
-		slog.String("kernel_release", kernel.Release()),
-	)
 	if 1023 < *pprofPort {
 		go func() {
 			_ = http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", pprofPort), nil)

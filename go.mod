@@ -6,7 +6,6 @@ require (
 	github.com/cilium/ebpf v0.13.2
 	github.com/go-delve/delve v1.22.1
 	github.com/prometheus/client_golang v1.19.0
-	github.com/stretchr/testify v1.8.4
 )
 
 require (
@@ -23,5 +22,4 @@ require (
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
