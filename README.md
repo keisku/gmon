@@ -32,6 +32,8 @@ time=2024-01-14T07:26:00.615Z level=INFO msg="goroutine is running" uptime=4.967
 # Build
 
 ```bash
-go get github.com/cilium/ebpf/cmd/bpf2go
-make
+docker build -t gmon .
+docker run --rm -v $(pwd):/src gmon
+# Ensure that the binary is created
+./bin/gmon -help
 ```
