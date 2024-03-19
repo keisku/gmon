@@ -28,14 +28,34 @@ import (
 	"go.uber.org/zap"
 )
 
-var level slog.Level
-var pid int
-var binPath string
-var traceOutPath string
-var pprofPort int
-var metricsPort int = 5500
+var (
+	level = flag.String(
+		"level",
+		slog.LevelInfo.String(),
+		fmt.Sprintf("log level could be one of %q",
+			[]slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError},
+		))
+	levelMap = map[string]slog.Level{
+		"DEBUG": slog.LevelDebug,
+		"debug": slog.LevelDebug,
+		"INFO":  slog.LevelInfo,
+		"info":  slog.LevelInfo,
+		"WARN":  slog.LevelWarn,
+		"warn":  slog.LevelWarn,
+		"ERROR": slog.LevelError,
+		"error": slog.LevelError,
+	}
+	pid          = flag.Int("pid", 0, "Useful when tracing programs that have many running instances")
+	binPath      = flag.String("path", "", "Path to executable file to be monitored (required)")
+	traceOutPath = flag.String("trace", "/tmp/gmon-trace.out", "File path to trace output")
+	pprofPort    = flag.Int("pprof", 0, "Port to be used for pprof server. If 0, pprof server is not started")
+	metricsPort  = flag.Int("metrics", 5500, "Port to be used for metrics server, /metrics endpoint")
+)
 
 func main() {
+	flag.Parse()
+	opts := &slog.HandlerOptions{Level: levelMap[*level]}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, opts)))
 	errlog := log.New(os.Stderr, "", log.LstdFlags)
 	prometheusexporterLogger, _ := zap.NewProduction()
 
@@ -43,18 +63,7 @@ func main() {
 		errlog.Fatalln("gmon only works on amd64 Linux")
 	}
 
-	flag.StringVar(&binPath, "path", binPath, "Path to executable file to be monitored (required)")
-	flag.StringVar(&traceOutPath, "trace", "/tmp/gmon-trace.out", "File path to trace output")
-	flag.TextVar(&level, "level", level, fmt.Sprintf("log level could be one of %q",
-		[]slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError}))
-	flag.IntVar(&pid, "pid", pid, "Useful when tracing programs that have many running instances")
-	flag.IntVar(&pprofPort, "pprof-port", pprofPort, "Port to be used for pprof server")
-	flag.IntVar(&metricsPort, "metrics-port", metricsPort, "Port to be used for metrics server, /metrics endpoint")
-	flag.Parse()
-	opts := &slog.HandlerOptions{Level: level}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, opts)))
-
-	traceOutFile, err := os.Create(traceOutPath)
+	traceOutFile, err := os.Create(*traceOutPath)
 	if err != nil {
 		errlog.Fatalln(err)
 	}
@@ -89,7 +98,7 @@ func main() {
 		},
 		&prometheusexporter.Config{
 			HTTPServerSettings: confighttp.HTTPServerSettings{
-				Endpoint: fmt.Sprintf("127.0.0.1:%d", metricsPort),
+				Endpoint: fmt.Sprintf("127.0.0.1:%d", *metricsPort),
 			},
 			Namespace:         "gmon",
 			EnableOpenMetrics: true,
@@ -112,8 +121,8 @@ func main() {
 	}()
 
 	ebpfConfig, err := ebpf.NewConfig(
-		binPath,
-		pid,
+		*binPath,
+		*pid,
 		metricsQueue,
 	)
 	if err != nil {
@@ -125,10 +134,10 @@ func main() {
 	}
 	slog.Debug(
 		"gmon starts",
-		slog.String("binary_path", binPath),
+		slog.String("binary_path", *binPath),
 		slog.String("kernel_release", kernel.Release()),
 	)
-	if 1023 < pprofPort {
+	if 1023 < *pprofPort {
 		go func() {
 			_ = http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", pprofPort), nil)
 		}()
