@@ -4,7 +4,7 @@
 
 # Pre-requisites
 
-- Kernel version >= 6.2.0
+- Kernel version >= 6.2.0, as I didn't test it on older versions.
 - amd64 (x86_64) architecture
 
 # Usage
