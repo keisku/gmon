@@ -14,14 +14,15 @@ import (
 )
 
 var (
-	namespace     = "gmon"
-	goroutineExit = promauto.NewCounterVec(
+	namespace      = "gmon"
+	stackLabelKeys = []string{"stack_0", "stack_1", "stack_2", "stack_3", "stack_4"} // 0 is the top
+	goroutineExit  = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "goroutine_exit",
 			Help:      "The number of goroutines that have been exited",
 		},
-		[]string{"top_frame"},
+		stackLabelKeys,
 	)
 	goroutineCreation = promauto.NewCounterVec(
 		prometheus.CounterOpts{
@@ -29,7 +30,7 @@ var (
 			Name:      "goroutine_creation",
 			Help:      "The number of goroutines that have been creaated",
 		},
-		[]string{"top_frame"},
+		stackLabelKeys,
 	)
 	goroutineUptime = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -38,7 +39,7 @@ var (
 			Help:      "Uptime of goroutines in seconds",
 			Buckets:   []float64{0.1, 0.25, 0.5, 1, 3, 5, 10, 30, 60, 120, 180},
 		},
-		[]string{"top_frame"},
+		stackLabelKeys,
 	)
 )
 
@@ -47,27 +48,6 @@ type goroutine struct {
 	ObservedAt time.Time
 	Stack      []*proc.Function
 	Exit       bool
-}
-
-// topFunctionName returns the name of the top function in the stack.
-func (g *goroutine) topFrame() string {
-	if len(g.Stack) == 0 {
-		slog.Debug("goroutine stack is empty", slog.Int64("goroutine_id", g.Id), slog.Bool("exit", g.Exit))
-		return ""
-	}
-	f := g.Stack[len(g.Stack)-1]
-	if f == nil {
-		return ""
-	}
-	if len(g.Stack) > 2 && f.Name == "runtime.gcWriteBarrier" {
-		// runtime.gcWriteBarrier is used to track modifications to pointer values in heap-allocated objects.
-		// This tracking is essential for the garbage collector to correctly identify which objects are still
-		// reachable and, therefore, should not be collected.
-		// Implementation: https://github.com/golang/go/blob/go1.21.6/src/runtime/asm_amd64.s#L1676-L1694
-		// Great blog: https://ihagopian.com/posts/write-barriers-in-the-go-garbage-collector
-		return g.Stack[len(g.Stack)-2].Name
-	}
-	return f.Name
 }
 
 type reporter struct {
@@ -95,7 +75,7 @@ func (r *reporter) reportUptime(ctx context.Context) {
 			trace.WithRegion(ctx, "reporter.report_goroutine_uptime.iterate_goroutine_map", func() {
 				r.goroutineMap.Range(func(_, value any) bool {
 					g := value.(goroutine)
-					goroutineUptime.WithLabelValues(g.topFrame()).Observe(time.Since(g.ObservedAt).Seconds())
+					goroutineUptime.With(stackLabels(g.Stack)).Observe(time.Since(g.ObservedAt).Seconds())
 					return true
 				})
 			})
@@ -121,8 +101,8 @@ func (r *reporter) storeGoroutine(ctx context.Context, g goroutine) {
 			slog.Error("goroutineMap has unexpected value", slog.Any("value", v))
 			return
 		}
-		goroutineExit.WithLabelValues(oldg.topFrame()).Inc()
-		goroutineUptime.WithLabelValues(oldg.topFrame()).Observe(time.Since(oldg.ObservedAt).Seconds())
+		goroutineExit.With(stackLabels(oldg.Stack)).Inc()
+		goroutineUptime.With(stackLabels(oldg.Stack)).Observe(time.Since(oldg.ObservedAt).Seconds())
 		r.goroutineMap.Delete(oldg.Id)
 		task.End()
 		return
@@ -133,7 +113,7 @@ func (r *reporter) storeGoroutine(ctx context.Context, g goroutine) {
 	}
 	_, task := trace.NewTask(ctx, "reporter.store_goroutine_creation")
 	slog.Info("goroutine is created", slog.Int64("goroutine_id", g.Id), stackLogAttr(g.Stack))
-	goroutineCreation.WithLabelValues(g.topFrame()).Inc()
+	goroutineCreation.With(stackLabels(g.Stack)).Inc()
 	r.goroutineMap.Store(g.Id, g)
 	task.End()
 }
@@ -148,4 +128,28 @@ func stackLogAttr(stack []*proc.Function) slog.Attr {
 		attrs[i] = slog.String(fmt.Sprintf("%d", i), f.Name)
 	}
 	return slog.Group("stack", attrs...)
+}
+
+// stackLabels generates a set of Prometheus labels for the top functions in the stack.
+// If the stack has fewer than expected functions, it fills the remaining labels with "none".
+func stackLabels(stack []*proc.Function) prometheus.Labels {
+	labels := prometheus.Labels{}
+
+	// Ensure to only process the top 5 elements, or the stack length if shorter.
+	topN := len(stack)
+	if topN > len(stackLabelKeys) {
+		topN = len(stackLabelKeys)
+	}
+
+	for i := 0; i < len(stackLabelKeys); i++ {
+		labelKey := fmt.Sprintf("stack_%d", i)
+		if i < topN {
+			// Stack is reversed, so we start from the end of the slice.
+			labels[labelKey] = stack[len(stack)-1-i].Name
+		} else {
+			labels[labelKey] = "none"
+		}
+	}
+
+	return labels
 }
