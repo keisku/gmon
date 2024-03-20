@@ -38,7 +38,7 @@ var (
 	}
 	pid          = flag.Int("pid", 0, "Useful when tracing programs that have many running instances")
 	binPath      = flag.String("path", "", "Path to executable file to be monitored (required)")
-	traceOutPath = flag.String("trace", "/tmp/gmon-trace.out", "File path to trace output")
+	traceOutPath = flag.String("trace", "", "Path to Go runtime/trace output")
 	pprofPort    = flag.Int("pprof", 0, "Port to be used for pprof server. If 0, pprof server is not started")
 	metricsPort  = flag.Int("metrics", 5500, "Port to be used for metrics server, /metrics endpoint")
 )
@@ -59,12 +59,14 @@ func main() {
 		errlog.Fatalln("gmon only works on amd64 Linux")
 	}
 
-	traceOutFile, err := os.Create(*traceOutPath)
-	if err != nil {
-		errlog.Fatalln(err)
-	}
-	if err := trace.Start(traceOutFile); err != nil {
-		errlog.Fatalln(err)
+	if *traceOutPath != "" {
+		traceOutFile, err := os.Create(*traceOutPath)
+		if err != nil {
+			errlog.Fatalln(err)
+		}
+		if err := trace.Start(traceOutFile); err != nil {
+			errlog.Fatalln(err)
+		}
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)

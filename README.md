@@ -11,14 +11,18 @@
 
 ```
 Usage of gmon:
-  -level value
-    	log level could be one of ["DEBUG" "INFO" "WARN" "ERROR"] (default INFO)
+  -level string
+    	log level could be one of ["DEBUG" "INFO" "WARN" "ERROR"] (default "INFO")
+  -metrics int
+    	Port to be used for metrics server, /metrics endpoint (default 5500)
   -path string
     	Path to executable file to be monitored (required)
   -pid int
     	Useful when tracing programs that have many running instances
-  -pprof-port int
-    	Port to be used for pprof server
+  -pprof int
+    	Port to be used for pprof server. If 0, pprof server is not started
+  -trace string
+    	Path to Go runtime/trace output
 ```
 
 Example
