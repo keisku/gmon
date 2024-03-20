@@ -20,6 +20,9 @@ RUN apt-get update && apt-get install -y \
 	tar -xzf /tmp/bpftool.tar.gz -C /usr/bin/ && rm /tmp/bpftool.tar.gz && \
 	chmod +x /usr/bin/bpftool && \
 	go install honnef.co/go/tools/cmd/staticcheck@latest
+COPY ./e2e /src/e2e
+WORKDIR /src/e2e/fixture
+RUN go build && chmod +x fixture
 WORKDIR /src
 COPY ./go.mod ./go.mod
 RUN go mod download
