@@ -116,17 +116,13 @@ func (r *reporter) storeGoroutine(ctx context.Context, g goroutine) {
 	v, loaded := r.goroutineMap.Load(g.Id)
 	if loaded {
 		_, task := trace.NewTask(ctx, "reporter.store_goroutine_exit")
-		oldg := v.(goroutine)
-		uptime := time.Since(oldg.ObservedAt)
-		logAttrs := []any{
-			slog.Duration("uptime", uptime),
-			slog.Int64("goroutine_id", g.Id),
-			// Don't use g.Stack since goexit1 doesn't have informative stack.
-			stackLogAttr(oldg.Stack),
+		oldg, ok := v.(goroutine)
+		if !ok {
+			slog.Error("goroutineMap has unexpected value", slog.Any("value", v))
+			return
 		}
-		slog.Info("goroutine is terminated", logAttrs...)
 		goroutineExit.WithLabelValues(oldg.topFrame()).Inc()
-		goroutineUptime.WithLabelValues(oldg.topFrame()).Observe(uptime.Seconds())
+		goroutineUptime.WithLabelValues(oldg.topFrame()).Observe(time.Since(oldg.ObservedAt).Seconds())
 		r.goroutineMap.Delete(oldg.Id)
 		task.End()
 		return
@@ -136,6 +132,7 @@ func (r *reporter) storeGoroutine(ctx context.Context, g goroutine) {
 		return
 	}
 	_, task := trace.NewTask(ctx, "reporter.store_goroutine_creation")
+	slog.Info("goroutine is created", slog.Int64("goroutine_id", g.Id), stackLogAttr(g.Stack))
 	goroutineCreation.WithLabelValues(g.topFrame()).Inc()
 	r.goroutineMap.Store(g.Id, g)
 	task.End()
