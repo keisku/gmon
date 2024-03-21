@@ -71,17 +71,20 @@ gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="net/http.(*Server
 ...skip...
 ```
 
-# Build
+# Development
+
+Follow [the Docker installation guide](https://docs.docker.com/engine/install/#supported-platforms) to build and run tests.
+
+Build
 
 ```bash
-docker build -t gmon .
-docker run --rm -v $(pwd):/src gmon
+make
 # Ensure that the binary is created
 ./bin/gmon -help
 ```
 
-# Test
+Test
 
 ```bash
-docker run --rm --privileged -v /sys/kernel/debug:/sys/kernel/debug:ro -v $(pwd):/src gmon make test e2e
+make test
 ```

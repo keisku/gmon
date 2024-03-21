@@ -24,5 +24,4 @@ bin
 
 .vscode/launch.json
 
-e2e/fixture/fixture
-e2e/e2e
+fixture/fixture
