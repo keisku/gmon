@@ -22,7 +22,9 @@ RUN apt-get update && apt-get install -y \
 	go install honnef.co/go/tools/cmd/staticcheck@latest
 COPY ./e2e /src/e2e
 WORKDIR /src/e2e/fixture
-RUN go build && chmod +x fixture
+RUN go build
+WORKDIR /src/e2e
+RUN go build
 WORKDIR /src
 COPY ./go.mod ./go.mod
 RUN go mod download
