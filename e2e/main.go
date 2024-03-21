@@ -208,13 +208,20 @@ func testGmonMetrics(_ context.Context) (err error) {
 		}
 	}()
 
-	// TODO: Should test contents of metric value and labels.
 	expectedMetrics := []string{
 		"gmon_goroutine_creation",
 		"gmon_goroutine_exit",
 		"gmon_goroutine_uptime",
 	}
-	actualMetrics := make(map[string]struct{})
+	// Due to the high cardinality concern, we add up to 5 stack labels to metrics.
+	expectedLabels := map[string]struct{}{
+		"stack_0": {},
+		"stack_1": {},
+		"stack_2": {},
+		"stack_3": {},
+		"stack_4": {},
+	}
+	actualMetrics := make(map[string][]*dto.Metric)
 
 	dec := expfmt.NewDecoder(bytes.NewReader(b), expfmt.NewFormat(expfmt.TypeTextPlain))
 	for {
@@ -225,11 +232,23 @@ func testGmonMetrics(_ context.Context) (err error) {
 			}
 			return fmt.Errorf("decode /metrics: %w", err)
 		}
-		actualMetrics[mf.GetName()] = struct{}{}
+		actualMetrics[mf.GetName()] = mf.GetMetric()
 	}
 	for _, expected := range expectedMetrics {
-		if _, ok := actualMetrics[expected]; !ok {
-			return fmt.Errorf("%s is missing", expected)
+		ms, ok := actualMetrics[expected]
+		if !ok {
+			return fmt.Errorf("metric %q is not found", expected)
+		}
+		for _, m := range ms {
+			for _, l := range m.GetLabel() {
+				if _, ok := expectedLabels[l.GetName()]; ok {
+					if strings.EqualFold(l.GetValue(), "") || strings.EqualFold(l.GetName(), "none") {
+						return fmt.Errorf("%q should have a valid function name", l.GetName())
+					}
+				} else {
+					return fmt.Errorf("%q doesn't exist in %q", l.GetName(), m)
+				}
+			}
 		}
 	}
 	return nil
