@@ -44,30 +44,24 @@ curl -s http://localhost:5500/metrics
 
 # HELP gmon_goroutine_creation The number of goroutines that have been creaated
 # TYPE gmon_goroutine_creation counter
-gmon_goroutine_creation{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc"} 3
+gmon_goroutine_creation{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc"} 1
 gmon_goroutine_creation{stack_0="runtime.goexit",stack_1="net/http.(*Server).Serve.gowrap3",stack_2="net/http.(*conn).serve",stack_3="net/http.(*connReader).startBackgroundRead",stack_4="runtime.newproc"} 3
 # HELP gmon_goroutine_exit The number of goroutines that have been exited
 # TYPE gmon_goroutine_exit counter
-gmon_goroutine_exit{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc"} 3
 gmon_goroutine_exit{stack_0="runtime.goexit",stack_1="net/http.(*Server).Serve.gowrap3",stack_2="net/http.(*conn).serve",stack_3="net/http.(*connReader).startBackgroundRead",stack_4="runtime.newproc"} 3
 # HELP gmon_goroutine_uptime Uptime of goroutines in seconds
 # TYPE gmon_goroutine_uptime histogram
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="0.1"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="0.25"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="0.5"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="1"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="3"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="5"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="10"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="30"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="60"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="120"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="180"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="+Inf"} 3
-gmon_goroutine_uptime_sum{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc"} 0.000683721
-gmon_goroutine_uptime_count{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="net/http.(*Server).Serve.gowrap3",stack_2="net/http.(*conn).serve",stack_3="net/http.(*connReader).startBackgroundRead",stack_4="runtime.newproc",le="0.1"} 3
-gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="net/http.(*Server).Serve.gowrap3",stack_2="net/http.(*conn).serve",stack_3="net/http.(*connReader).startBackgroundRead",stack_4="runtime.newproc",le="0.25"} 3
+gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="1"} 2
+gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="3"} 2
+gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="5"} 2
+gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="10"} 2
+gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="30"} 2
+gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="60"} 2
+gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="120"} 2
+gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="180"} 2
+gmon_goroutine_uptime_bucket{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc",le="+Inf"} 2
+gmon_goroutine_uptime_sum{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc"} 0.9001332019999999
+gmon_goroutine_uptime_count{stack_0="runtime.goexit",stack_1="main.main.gowrap1",stack_2="net/http.(*Server).ListenAndServe",stack_3="net/http.(*Server).Serve",stack_4="runtime.newproc"} 2
 ...skip...
 ```
 

@@ -37,7 +37,7 @@ var (
 			Namespace: namespace,
 			Name:      "goroutine_uptime",
 			Help:      "Uptime of goroutines in seconds",
-			Buckets:   []float64{0.1, 0.25, 0.5, 1, 3, 5, 10, 30, 60, 120, 180},
+			Buckets:   []float64{1, 3, 5, 10, 30, 60, 120, 180},
 		},
 		stackLabelKeys,
 	)
