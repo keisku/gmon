@@ -1,0 +1,41 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+name: gmon test
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: docker build -t gmonbuildenv -f Dockerfile.buildenv .
+      - name: Build gmon
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/src \
+          -e GOFLAGS="-buildvcs=false" \
+          -e BPF_CLANG="clang" \
+          -e BPF_CFLAGS="-O2 -g -Wall -Werror" \
+          gmonbuildenv \
+          script/build.sh
+      - name: Format gmon
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/src \
+          -e GOFLAGS="-buildvcs=false" \
+          gmonbuildenv \
+          script/format.sh
+      - name: Check changes
+        run: |
+          if ! git diff --quiet || ! git diff --staged --quiet; then
+            echo "Changes detected"
+            uname -a
+            git diff
+            git diff --staged
+            exit 1
+          fi
+      - run: docker build -t gmone2e -f Dockerfile.e2e .
+      - name: Run e2e tests
+        run: |
+          docker run --rm --privileged -v ${{ github.workspace }}/bin/gmon:/usr/bin/gmon -v /sys/kernel/debug:/sys/kernel/debug:ro gmone2e
