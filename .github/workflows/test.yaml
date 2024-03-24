@@ -8,12 +8,6 @@ jobs:
         with:
           fetch-depth: 0
       - run: docker build -t gmonbuildenv -f Dockerfile.buildenv .
-      - name: Format gmon
-        run: |
-          docker run --rm -v ${{ github.workspace }}:/src \
-          -e GOFLAGS="-buildvcs=false" \
-          gmonbuildenv \
-          script/format.sh
       - name: Build gmon
         run: |
           docker run --rm -v ${{ github.workspace }}:/src \
@@ -22,6 +16,12 @@ jobs:
           -e BPF_CFLAGS="-O2 -g -Wall -Werror" \
           gmonbuildenv \
           script/build.sh
+      - name: Format gmon
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/src \
+          -e GOFLAGS="-buildvcs=false" \
+          gmonbuildenv \
+          script/format.sh
       - name: Check changes
         run: |
           if ! git diff --quiet || ! git diff --staged --quiet; then
