@@ -5,9 +5,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - run: docker build -t gmonbuildenv -f Dockerfile.buildenv .
       - name: Build gmon
         run: docker run --rm -v ${{ github.workspace }}:/src -e GOFLAGS="-buildvcs=false" -e BPF_CLANG="clang" -e BPF_CFLAGS="-O2 -g -Wall -Werror" gmonbuildenv bash -c "bpftool btf dump file /sys/kernel/btf/vmlinux format c > ./ebpf/c/vmlinux.h && go generate -x ./... && CGO_ENABLED=0 go build -o /src/bin/gmon"
+      - name: Check changes
+        run: |
+          if ! git diff --quiet || ! git diff --staged --quiet; then
+            echo "Changes detected:"
+            git diff
+            git diff --staged
+            exit 1
+          fi
       - run: docker build -t gmone2e -f Dockerfile.e2e .
       - name: Run e2e tests
         run: |
