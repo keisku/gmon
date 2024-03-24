@@ -25,3 +25,5 @@ bin
 .vscode/launch.json
 
 fixture/fixture
+ebpf/c/vmlinux.h
+ebpf/bpf_x86_bpfel.o
