@@ -3,6 +3,9 @@ name: gmon test
 jobs:
   test:
     runs-on: ubuntu-latest
+    container:
+      image: docker:dind
+      options: --privileged
     steps:
       - uses: actions/checkout@v3
       - run: docker build -t gmonbuildenv -f Dockerfile.buildenv .
