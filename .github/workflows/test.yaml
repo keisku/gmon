@@ -13,7 +13,8 @@ jobs:
       - name: Check changes
         run: |
           if ! git diff --quiet || ! git diff --staged --quiet; then
-            echo "Changes detected:"
+            echo "Changes detected"
+            uname -a
             git diff
             git diff --staged
             exit 1
