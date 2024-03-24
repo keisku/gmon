@@ -2,11 +2,13 @@
 
 all: format build
 
-format: export GOFLAGS := -buildvcs=false
 format:
-	go mod tidy
-	staticcheck ./...
-	find . -type f \( -name '*.[ch]' -and -not -name 'vmlinux.h' \) -exec clang-format -i {} \;
+	docker build -t gmonbuildenv -f Dockerfile.buildenv .
+	docker run --rm -v $(shell pwd):/src \
+		-e GOFLAGS="-buildvcs=false" \
+		gmonbuildenv \
+		bash \
+		-c "go mod tidy && go vet ./... && staticcheck ./... && find . -type f \( -name '*.[ch]' -and -not -name 'vmlinux.h' \) -exec clang-format -i {} \;"
 
 build:
 	docker build -t gmonbuildenv -f Dockerfile.buildenv .
