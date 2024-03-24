@@ -1,0 +1,12 @@
+on: [push, pull_request]
+name: gmon test
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: docker build -t gmonbuildenv -f Dockerfile.buildenv .
+      - run: docker build -t gmone2e -f Dockerfile.e2e .
+      - name: Run e2e tests
+        run: |
+          docker run --rm --privileged -v ${{ github.workspace }}/bin/gmon:/usr/bin/gmon -v /sys/kernel/debug:/sys/kernel/debug:ro gmone2e
