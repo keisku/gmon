@@ -4,7 +4,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .
       - run: docker build -t gmonbuildenv -f Dockerfile.buildenv .
       - name: Build gmon
         run: docker run --rm -v ${{ github.workspace }}:/src -e GOFLAGS="-buildvcs=false" -e BPF_CLANG="clang" -e BPF_CFLAGS="-O2 -g -Wall -Werror" gmonbuildenv bash -c "bpftool btf dump file /sys/kernel/btf/vmlinux format c > ./ebpf/c/vmlinux.h && go generate -x ./... && CGO_ENABLED=0 go build -o /src/bin/gmon"
