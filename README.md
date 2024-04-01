@@ -69,16 +69,8 @@ gmon_goroutine_uptime_count{stack_0="runtime.goexit",stack_1="main.main.gowrap1"
 
 Follow [the Docker installation guide](https://docs.docker.com/engine/install/#supported-platforms) to build and run tests.
 
-Build
-
 ```bash
-make
-# Ensure that the binary is created
-./bin/gmon -help
-```
-
-Test
-
-```bash
-make test
+./gmon.sh build
+./gmon.sh install
+./gmon.sh test
 ```
