@@ -38,6 +38,7 @@ EOF
 docker build --platform linux/$arch -t $image_buildenv -f "$dockerfile_buildenv" .
 rm "$dockerfile_buildenv"
 
+rm -f $(pwd)/bin/gmon || true
 docker run --platform linux/$arch -i \
 -v $(pwd):/usr/src \
 -e BPF_CLANG="clang" \
@@ -51,6 +52,7 @@ if [ "$1" = "build" ]; then
 fi
 
 if [ "$1" = "install" ]; then
+  sudo rm -f /usr/bin/gmon || true
   sudo install ./bin/gmon /usr/bin/
   exit 0
 fi
