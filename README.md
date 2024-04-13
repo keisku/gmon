@@ -1,8 +1,8 @@
 # Goroutine MONitor (gmon)
 
-`gmon` is a tool designed to monitor the creation and destruction of goroutines in a Go program, drawing inspiration from the presentation [Real World Debugging with eBPF](https://www.usenix.org/conference/srecon23apac/presentation/liang).
+<img src="https://github.com/egonelbre/gophers/blob/63b1f5a9f334f9e23735c6e09ac003479ffe5df5/sketch/science/welding.png?raw=true" width="200" height="200">
 
-![gopher-sketch-science-welding](https://github.com/egonelbre/gophers/blob/63b1f5a9f334f9e23735c6e09ac003479ffe5df5/sketch/science/welding.png?raw=true)
+`gmon` is a tool designed to monitor the creation and destruction of goroutines in a Go program, drawing inspiration from the presentation [Real World Debugging with eBPF](https://www.usenix.org/conference/srecon23apac/presentation/liang).
 
 # Prerequisites
 
