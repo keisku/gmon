@@ -26,6 +26,10 @@ Usage of gmon:
     	Path to Go runtime/trace output
 ```
 
+## Demo
+
+https://github.com/keisku/gmon/assets/41987730/838fa12d-d622-4ad6-a9f0-6aab88acec55
+
 ## Stdout
 
 `gmon` logs the creation of goroutines to stdout with stack traces.
