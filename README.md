@@ -1,11 +1,12 @@
 # Goroutine MONitor (gmon)
 
+<img src="https://github.com/egonelbre/gophers/blob/63b1f5a9f334f9e23735c6e09ac003479ffe5df5/sketch/science/welding.png?raw=true" width="200" height="200">
+
 `gmon` is a tool designed to monitor the creation and destruction of goroutines in a Go program, drawing inspiration from the presentation [Real World Debugging with eBPF](https://www.usenix.org/conference/srecon23apac/presentation/liang).
 
-# Pre-requisites
+# Prerequisites
 
-- Kernel version >= 6.2.0, as I didn't test it on older versions.
-- amd64 (x86_64) architecture
+- amd64 (x86_64)
 
 # Usage
 
@@ -25,7 +26,9 @@ Usage of gmon:
     	Path to Go runtime/trace output
 ```
 
-## stdout
+## Stdout
+
+`gmon` logs the creation of goroutines to stdout with stack traces.
 
 ```bash
 sudo gmon -path /path/to/executable
@@ -37,7 +40,13 @@ time=2024-03-20T05:10:57.752Z level=INFO msg="goroutine is created" goroutine_id
 time=2024-03-20T05:10:57.752Z level=INFO msg="goroutine is created" goroutine_id=35 stack.0=runtime.newproc stack.1=runtime.systemstack stack.2=runtime.newproc stack.3=net/http.(*connReader).startBackgroundRead stack.4=net/http.(*conn).serve stack.5=net/http.(*Server).Serve.gowrap3 stack.6=runtime.goexit
 ```
 
-## GET /metrics
+## OpenMetrics
+
+`gmon` exposes the following metrics in the [OpenMetrics](https://www.cncf.io/projects/openmetrics/) format on the `GET /metrics`.
+
+- `gmon_goroutine_creation`
+- `gmon_goroutine_exit`
+- `gmon_goroutine_uptime`
 
 ```bash
 curl -s http://localhost:5500/metrics
@@ -70,7 +79,10 @@ gmon_goroutine_uptime_count{stack_0="runtime.goexit",stack_1="main.main.gowrap1"
 Follow [the Docker installation guide](https://docs.docker.com/engine/install/#supported-platforms) to build and run tests.
 
 ```bash
+# Build and output the binary to ./bin
 ./gmon.sh build
+# Build and install the binary to /usr/bin
 ./gmon.sh install
+# Run tests
 ./gmon.sh test
 ```
