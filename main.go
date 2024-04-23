@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"log/slog"
 	"net/http"
@@ -12,6 +15,7 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/trace"
+	"strings"
 
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/keisku/gmon/ebpf"
@@ -96,6 +100,9 @@ func main() {
 	if err != nil {
 		errlog.Fatalln(err)
 	}
+	if levelMap[*level] == slog.LevelDebug {
+		go logTracePipe(ctx.Done())
+	}
 	if 1023 < *pprofPort {
 		go func() {
 			_ = http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", pprofPort), nil)
@@ -104,4 +111,29 @@ func main() {
 	<-ctx.Done()
 	slog.Debug("gmon exits")
 	eBPFClose()
+}
+
+func logTracePipe(done <-chan struct{}) {
+	tracePipe, err := os.Open("/sys/kernel/debug/tracing/trace_pipe")
+	if err != nil {
+		slog.Error("open trace_pipe", slog.Any("error", err))
+		return
+	}
+	defer tracePipe.Close()
+
+	go func() {
+		scanner := bufio.NewScanner(tracePipe)
+		for scanner.Scan() {
+			msg := strings.TrimSpace(scanner.Text())
+			if strings.Contains(msg, "gmon") {
+				slog.Debug(msg)
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			if !errors.Is(err, fs.ErrClosed) {
+				slog.Error("read trace_pipe", slog.Any("error", err))
+			}
+		}
+	}()
+	<-done
 }
