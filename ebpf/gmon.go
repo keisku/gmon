@@ -1,14 +1,10 @@
 package ebpf
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"log/slog"
-	"os"
-	"strings"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
@@ -28,7 +24,6 @@ func Run(ctx context.Context, config Config) (func(), error) {
 	if err != nil {
 		return func() {}, err
 	}
-	go logTracePipe(ctx.Done())
 	ex, err := link.OpenExecutable(config.binPath)
 	if err != nil {
 		return func() {}, err
@@ -116,31 +111,4 @@ func linkUprobe(
 	}
 	slog.Debug("attach uprobe with address", slog.String("symbol", symbol), slog.String("address", fmt.Sprintf("%#x", address)))
 	return l, nil
-}
-
-func logTracePipe(done <-chan struct{}) {
-	tracePipe, err := os.Open("/sys/kernel/debug/tracing/trace_pipe")
-	if err != nil {
-		slog.Error("open trace_pipe", slog.Any("error", err))
-		return
-	}
-	defer tracePipe.Close()
-
-	go func() {
-		// Create a bufio.Scanner to read the trace data.
-		scanner := bufio.NewScanner(tracePipe)
-		// Read and print the trace data.
-		for scanner.Scan() {
-			msg := strings.TrimSpace(scanner.Text())
-			if strings.Contains(msg, "gmon") {
-				slog.Warn(msg)
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			if !errors.Is(err, fs.ErrClosed) {
-				slog.Error("read trace_pipe", slog.Any("error", err))
-			}
-		}
-	}()
-	<-done
 }
