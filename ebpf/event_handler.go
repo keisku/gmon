@@ -33,7 +33,7 @@ func (h *eventHandler) run(ctx context.Context) {
 				slog.Debug("ring buffer is closed")
 				return
 			}
-			slog.Warn(err.Error())
+			slog.Warn("Failed to read bpf ring buffer", slog.Any("error", err))
 			continue
 		}
 		stack, err := h.lookupStack(ctx, event.StackId)
@@ -62,10 +62,7 @@ func (h *eventHandler) readRecord(ctx context.Context, event *bpfEvent) error {
 	defer task.End()
 	record, err := h.reader.Read()
 	if err != nil {
-		if errors.Is(err, ringbuf.ErrClosed) {
-			return ringbuf.ErrClosed
-		}
-		return fmt.Errorf("read ring buffer: %w", err)
+		return err
 	}
 	if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, event); err != nil {
 		return fmt.Errorf("decode ring buffer record: %w", err)
