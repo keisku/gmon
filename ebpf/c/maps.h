@@ -16,9 +16,6 @@
         __type(value, _value_type);                                 \
     } _name SEC(".maps");
 
-#define BPF_HASH(_name, _key_type, _value_type, _max_entries) \
-    BPF_MAP(_name, BPF_MAP_TYPE_HASH, _key_type, _value_type, _max_entries)
-
 // stack traces: the value is 1 big byte array of the stack addresses
 typedef __u64 stack_trace_t[MAX_STACK_DEPTH];
 #define BPF_STACK_TRACE(_name, _max_entries) \
@@ -26,26 +23,17 @@ typedef __u64 stack_trace_t[MAX_STACK_DEPTH];
 
 BPF_STACK_TRACE(stack_addresses, MAX_STACK_ADDRESSES); // store stack traces
 
-struct newproc1_event_key {
+struct {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 1 << 24);
+} events SEC(".maps");
+
+struct event {
     int64_t goroutine_id;
-    uint64_t ktime; // To make this struct unique
-};
-
-struct newproc1_event {
     int stack_id;
+    bool exit;
 };
 
-BPF_HASH(newproc1_events, struct newproc1_event_key, struct newproc1_event, 10240);
-
-struct goexit1_event_key {
-    int64_t goroutine_id;
-    uint64_t ktime; // To make this struct unique
-};
-
-struct goexit1_event {
-    int stack_id;
-};
-
-BPF_HASH(goexit1_events, struct goexit1_event_key, struct goexit1_event, 10240);
+struct event *unused __attribute__((unused));
 
 #endif /* __MAPS_H__ */
