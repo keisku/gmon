@@ -5,6 +5,7 @@ go 1.22.1
 require (
 	github.com/cilium/ebpf v0.14.0
 	github.com/go-delve/delve v1.22.1
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/prometheus/client_golang v1.19.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.52.3

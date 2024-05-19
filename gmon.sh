@@ -8,6 +8,16 @@ if [ "$arch" != "x86_64" ]; then
   exit 1
 fi
 
+kernel_version=$(uname -r)
+major_version=$(echo $kernel_version | cut -d. -f1)
+minor_version=$(echo $kernel_version | cut -d. -f2)
+if [ "$major_version" -gt 5 ] || ([ "$major_version" -eq 5 ] && [ "$minor_version" -ge 8 ]); then
+    echo "Your kernel version is $kernel_version"
+else
+    echo "Your kernel version should be >= 5.8, got $kernel_version"
+    exit 1
+fi
+
 if [ "$1" = "build" ] || [ "$1" = "install" ] || [ "$1" = "test" ] || [ "$1" = "format" ]; then
   echo "Running $1 on $arch"
 else

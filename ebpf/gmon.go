@@ -8,11 +8,12 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
+	"github.com/cilium/ebpf/ringbuf"
 	"github.com/keisku/gmon/bininfo"
 )
 
 // $BPF_CLANG and $BPF_CFLAGS are set by the Makefile.
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -target amd64 -cflags $BPF_CFLAGS bpf ./c/gmon.c -- -I./c
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -type event -cc $BPF_CLANG -target amd64 -cflags $BPF_CFLAGS bpf ./c/gmon.c -- -I./c
 
 func Run(ctx context.Context, config Config) (func(), error) {
 	slog.Debug("eBPF programs start with config", slog.String("config", config.String()))
@@ -51,11 +52,16 @@ func Run(ctx context.Context, config Config) (func(), error) {
 	if err != nil {
 		return func() {}, err
 	}
+	ringbufReader, err := ringbuf.NewReader(objs.Events)
+	if err != nil {
+		return func() {}, err
+	}
 	goroutineQueue := make(chan goroutine, 100)
 	eventhandler := &eventHandler{
 		goroutineQueue: goroutineQueue,
 		objs:           &objs,
 		biTranslator:   biTranslator,
+		reader:         ringbufReader,
 	}
 	reporter := &reporter{
 		goroutineQueue: goroutineQueue,
@@ -63,6 +69,7 @@ func Run(ctx context.Context, config Config) (func(), error) {
 	go reporter.run(ctx)
 	go eventhandler.run(ctx)
 	return func() {
+		ringbufReader.Close()
 		for i := range links {
 			if err := links[i].Close(); err != nil {
 				slog.Warn("Failed to close link", slog.Any("error", err))

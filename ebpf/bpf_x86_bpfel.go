@@ -12,18 +12,11 @@ import (
 	"github.com/cilium/ebpf"
 )
 
-type bpfGoexit1Event struct{ StackId int32 }
-
-type bpfGoexit1EventKey struct {
+type bpfEvent struct {
 	GoroutineId int64
-	Ktime       uint64
-}
-
-type bpfNewproc1Event struct{ StackId int32 }
-
-type bpfNewproc1EventKey struct {
-	GoroutineId int64
-	Ktime       uint64
+	StackId     int32
+	Exit        bool
+	_           [3]byte
 }
 
 type bpfStackTraceT [20]uint64
@@ -77,8 +70,7 @@ type bpfProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
-	Goexit1Events  *ebpf.MapSpec `ebpf:"goexit1_events"`
-	Newproc1Events *ebpf.MapSpec `ebpf:"newproc1_events"`
+	Events         *ebpf.MapSpec `ebpf:"events"`
 	StackAddresses *ebpf.MapSpec `ebpf:"stack_addresses"`
 }
 
@@ -101,15 +93,13 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
-	Goexit1Events  *ebpf.Map `ebpf:"goexit1_events"`
-	Newproc1Events *ebpf.Map `ebpf:"newproc1_events"`
+	Events         *ebpf.Map `ebpf:"events"`
 	StackAddresses *ebpf.Map `ebpf:"stack_addresses"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
-		m.Goexit1Events,
-		m.Newproc1Events,
+		m.Events,
 		m.StackAddresses,
 	)
 }

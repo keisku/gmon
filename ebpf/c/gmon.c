@@ -39,14 +39,18 @@ int runtime_newproc1(struct pt_regs *ctx) {
         bpf_printk("%s:%d | failed to read stackid\n", __FILE__, __LINE__);
         return 0;
     }
-    struct newproc1_event_key key = {
-        .goroutine_id = goid,
-        .ktime = bpf_ktime_get_ns(),
-    };
-    struct newproc1_event event = {
-        .stack_id = stack_id,
-    };
-    bpf_map_update_elem(&newproc1_events, &key, &event, BPF_ANY);
+
+    struct event *ev;
+    ev = bpf_ringbuf_reserve(&events, sizeof(*ev), 0);
+    if (!ev) {
+        bpf_printk("%s:%d | failed to reserve ringbuf\n", __FILE__, __LINE__);
+        return 0;
+    }
+    ev->goroutine_id = goid;
+    ev->stack_id = stack_id;
+    ev->exit = false;
+    bpf_ringbuf_submit(ev, 0);
+
     return 0;
 }
 
@@ -65,14 +69,17 @@ int runtime_goexit1(struct pt_regs *ctx) {
         return 0;
     }
 
-    struct goexit1_event_key key = {
-        .goroutine_id = go_id,
-        .ktime = bpf_ktime_get_ns(),
-    };
-    struct goexit1_event event = {
-        .stack_id = stack_id,
-    };
-    bpf_map_update_elem(&goexit1_events, &key, &event, BPF_ANY);
+    struct event *ev;
+    ev = bpf_ringbuf_reserve(&events, sizeof(*ev), 0);
+    if (!ev) {
+        bpf_printk("%s:%d | failed to reserve ringbuf\n", __FILE__, __LINE__);
+        return 0;
+    }
+    ev->goroutine_id = go_id;
+    ev->stack_id = stack_id;
+    ev->exit = true;
+    bpf_ringbuf_submit(ev, 0);
+
     return 0;
 }
 

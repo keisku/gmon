@@ -7,6 +7,7 @@
 # Prerequisites
 
 - amd64 (x86_64)
+- Linux Kernel 5.8+ since `gmon` uses [BPF ring buffer](https://nakryiko.com/posts/bpf-ringbuf/)
 
 # Usage
 
