@@ -13,7 +13,7 @@ import (
 
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/go-delve/delve/pkg/proc"
-	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/keisku/gmon/bininfo"
 )
 
@@ -26,7 +26,17 @@ type eventHandler struct {
 
 func (h *eventHandler) run(ctx context.Context) {
 	var event bpfEvent
-	stackIdCache, _ := lru.New[int32, struct{}](16)
+	// To delete stack_addresses that is not used recently.
+	stackIdCache := expirable.NewLRU[int32, struct{}](
+		32, // cache size
+		func(key int32, _ struct{}) {
+			slog.Debug("delete stack_addresses", slog.Int("stack_id", int(key)))
+			if err := h.objs.StackAddresses.Delete(key); err != nil {
+				slog.Debug("Failed to delete stack_addresses", slog.Any("error", err))
+			}
+		},
+		time.Minute, // TTL of each cache entry
+	)
 	for {
 		if err := h.readRecord(ctx, &event); err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
@@ -47,13 +57,7 @@ func (h *eventHandler) run(ctx context.Context) {
 			Stack:      stack,
 			Exit:       event.Exit,
 		})
-		contains, _ := stackIdCache.ContainsOrAdd(event.StackId, struct{}{})
-		if !contains {
-			slog.Debug("delete stack_addresses", slog.Int("stack_id", int(event.StackId)))
-			if err := h.objs.StackAddresses.Delete(event.StackId); err != nil {
-				slog.Debug("Failed to delete stack_addresses", slog.Any("error", err))
-			}
-		}
+		_ = stackIdCache.Add(event.StackId, struct{}{})
 	}
 }
 
