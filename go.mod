@@ -1,6 +1,6 @@
 module github.com/keisku/gmon
 
-go 1.22.1
+go 1.22.3
 
 require (
 	github.com/cilium/ebpf v0.15.0

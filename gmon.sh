@@ -40,7 +40,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   ln -s /usr/bin/clang-14 /usr/bin/clang && \
   ln -s /usr/bin/clang-format-14 /usr/bin/clang-format
 RUN wget -O- --no-check-certificate https://github.com/libbpf/bpftool/releases/download/v7.3.0/bpftool-v7.3.0-amd64.tar.gz | tar -xzf - -C /usr/bin && chmod +x /usr/bin/bpftool
-RUN wget -O- --no-check-certificate https://go.dev/dl/go1.22.1.linux-amd64.tar.gz | tar -xzf - -C /usr/local && chmod +x /usr/local/go/bin/go && ln -s /usr/local/go/bin/go /usr/bin/go
+RUN wget -O- --no-check-certificate https://go.dev/dl/go1.22.3.linux-amd64.tar.gz | tar -xzf - -C /usr/local && chmod +x /usr/local/go/bin/go && ln -s /usr/local/go/bin/go /usr/bin/go
 WORKDIR /usr/src
 COPY go.mod go.mod
 RUN go mod download
