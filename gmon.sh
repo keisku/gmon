@@ -28,7 +28,7 @@ fi
 image_buildenv=gmon-buildenv-$arch
 dockerfile_buildenv=$(mktemp)
 cat > "$dockerfile_buildenv" <<EOF
-FROM debian:bookworm-2024031@sha256:e97ee92bf1e11a2de654e9f3da827d8dce32b54e0490ac83bfc65c8706568116
+FROM debian:bookworm-20240513@sha256:fac2c0fd33e88dfd3bc88a872cfb78dcb167e74af6162d31724df69e482f886c
 RUN apt-get update && apt-get install -y --no-install-recommends \
   wget \
   llvm-14 \
