@@ -30,6 +30,7 @@ dockerfile_buildenv=$(mktemp)
 cat > "$dockerfile_buildenv" <<EOF
 FROM debian:bookworm-20240513@sha256:fac2c0fd33e88dfd3bc88a872cfb78dcb167e74af6162d31724df69e482f886c
 RUN apt-get update && apt-get install -y --no-install-recommends \
+  git \
   wget \
   llvm-14 \
   clang-14 \
@@ -54,9 +55,12 @@ docker run --platform linux/$arch -i \
 -e BPF_CLANG="clang" \
 -e BPF_CFLAGS="-O2 -g -Wall -Werror" \
 --rm $image_buildenv bash -c '\
+  git config --global --add safe.directory /usr/src && \
   bpftool btf dump file /sys/kernel/btf/vmlinux format c > ./ebpf/c/vmlinux.h && \
   go generate -x ./... && \
-  GOFLAGS="-buildvcs=false" CGO_ENABLED=0 go build -o /usr/src/bin/gmon'
+  GOFLAGS="-buildvcs=auto" CGO_ENABLED=0 go build \
+  -ldflags "-s -w -X main.Version=0.0.0-dev" \
+  -o /usr/src/bin/gmon'
 if [ "$1" = "build" ]; then
   exit 0
 fi
