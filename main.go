@@ -61,8 +61,9 @@ func (promLogger) Println(v ...interface{}) {
 func main() {
 	flag.Parse()
 	if *printVersion {
-		var arch, goos, commitHash = "unknown", "unknown", "unknown"
+		var gover, arch, goos, commitHash = "unknown", "unknown", "unknown", "unknown"
 		if info, ok := debug.ReadBuildInfo(); ok {
+			gover = info.GoVersion
 			for _, s := range info.Settings {
 				switch s.Key {
 				case "GOARCH":
@@ -74,7 +75,7 @@ func main() {
 				}
 			}
 		}
-		fmt.Printf("gmon %s (%s/%s) commit=%s\n", Version, goos, arch, commitHash)
+		fmt.Printf("gmon %s (%s/%s) %s, commit=%s\n", Version, goos, arch, gover, commitHash)
 		return
 	}
 
