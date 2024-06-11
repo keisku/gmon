@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"runtime/trace"
 	"strings"
 
@@ -45,6 +46,10 @@ var (
 	traceOutPath = flag.String("trace", "", "Path to Go runtime/trace output")
 	pprofPort    = flag.Int("pprof", 0, "Port to be used for pprof server. If 0, pprof server is not started")
 	metricsPort  = flag.Int("metrics", 5500, "Port to be used for metrics server, /metrics endpoint")
+	printVersion = flag.Bool("version", false, "Print version information")
+
+	// Set by -ldflags at build time
+	Version = "unknown"
 )
 
 type promLogger struct{}
@@ -55,6 +60,25 @@ func (promLogger) Println(v ...interface{}) {
 
 func main() {
 	flag.Parse()
+	if *printVersion {
+		var gover, arch, goos, commitHash = "unknown", "unknown", "unknown", "unknown"
+		if info, ok := debug.ReadBuildInfo(); ok {
+			gover = info.GoVersion
+			for _, s := range info.Settings {
+				switch s.Key {
+				case "GOARCH":
+					arch = s.Value
+				case "GOOS":
+					goos = s.Value
+				case "vcs.revision":
+					commitHash = s.Value
+				}
+			}
+		}
+		fmt.Printf("gmon %s (%s/%s) %s, commit=%s\n", Version, goos, arch, gover, commitHash)
+		return
+	}
+
 	opts := &slog.HandlerOptions{Level: levelMap[*level]}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, opts)))
 	errlog := log.New(os.Stderr, "", log.LstdFlags)
