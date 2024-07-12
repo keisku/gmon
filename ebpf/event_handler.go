@@ -27,9 +27,9 @@ type eventHandler struct {
 func (h *eventHandler) run(ctx context.Context) {
 	var event bpfEvent
 	// To delete stack_addresses that is not used recently.
-	stackIdCache := expirable.NewLRU[int32, struct{}](
+	stackIdCache := expirable.NewLRU[int32, []*proc.Function](
 		32, // cache size
-		func(key int32, _ struct{}) {
+		func(key int32, _ []*proc.Function) {
 			slog.Debug("delete stack_addresses", slog.Int("stack_id", int(key)))
 			if err := h.objs.StackAddresses.Delete(key); err != nil {
 				slog.Debug("Failed to delete stack_addresses", slog.Any("error", err))
@@ -46,10 +46,16 @@ func (h *eventHandler) run(ctx context.Context) {
 			slog.Warn("Failed to read bpf ring buffer", slog.Any("error", err))
 			continue
 		}
-		stack, err := h.lookupStack(ctx, event.StackId)
-		if err != nil {
-			slog.Warn(err.Error())
-			continue
+		var stack []*proc.Function
+		var ok bool
+		var err error
+		stack, ok = stackIdCache.Get(event.StackId)
+		if !ok {
+			stack, err = h.lookupStack(ctx, event.StackId)
+			if err != nil {
+				slog.Warn(err.Error())
+				continue
+			}
 		}
 		h.sendGoroutine(goroutine{
 			Id:         event.GoroutineId,
@@ -57,7 +63,7 @@ func (h *eventHandler) run(ctx context.Context) {
 			Stack:      stack,
 			Exit:       event.Exit,
 		})
-		_ = stackIdCache.Add(event.StackId, struct{}{})
+		_ = stackIdCache.Add(event.StackId, stack)
 	}
 }
 
