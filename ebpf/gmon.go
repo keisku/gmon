@@ -76,7 +76,7 @@ func Run(ctx context.Context, config Config) (func(), error) {
 			}
 		}
 		if err := objs.Close(); err != nil {
-			slog.Warn("Failed to close bpf objects: %s", err)
+			slog.Warn("Failed to close bpf objects", slog.Any("error", err))
 		}
 	}, nil
 }
