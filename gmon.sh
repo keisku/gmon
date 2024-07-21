@@ -29,19 +29,22 @@ image_buildenv=gmon-buildenv-$arch
 dockerfile_buildenv=$(mktemp)
 cat > "$dockerfile_buildenv" <<EOF
 FROM debian:bookworm-20240513@sha256:fac2c0fd33e88dfd3bc88a872cfb78dcb167e74af6162d31724df69e482f886c
-RUN apt-get update && apt-get install -y --no-install-recommends \
-  git \
-  wget \
-  llvm-14 \
-  clang-14 \
-  libbpf-dev \
+RUN <<END
+apt-get update
+apt-get install -y --no-install-recommends \
   ca-certificates \
-  clang-format-14 && \
-  ln -s /usr/bin/llvm-strip-14 /usr/bin/llvm-strip && \
-  ln -s /usr/bin/clang-14 /usr/bin/clang && \
-  ln -s /usr/bin/clang-format-14 /usr/bin/clang-format
-RUN wget -O- --no-check-certificate https://github.com/libbpf/bpftool/releases/download/v7.3.0/bpftool-v7.3.0-amd64.tar.gz | tar -xzf - -C /usr/bin && chmod +x /usr/bin/bpftool
-RUN wget -O- --no-check-certificate https://go.dev/dl/go1.22.3.linux-amd64.tar.gz | tar -xzf - -C /usr/local && chmod +x /usr/local/go/bin/go && ln -s /usr/local/go/bin/go /usr/bin/go
+  clang-14 \
+  clang-format-14 \
+  git \
+  libbpf-dev \
+  llvm-14 \
+  wget
+ln -s /usr/bin/llvm-strip-14 /usr/bin/llvm-strip
+ln -s /usr/bin/clang-14 /usr/bin/clang
+ln -s /usr/bin/clang-format-14 /usr/bin/clang-format
+wget -O- --no-check-certificate https://github.com/libbpf/bpftool/releases/download/v7.3.0/bpftool-v7.3.0-amd64.tar.gz | tar -xzf - -C /usr/bin && chmod +x /usr/bin/bpftool
+wget -O- --no-check-certificate https://go.dev/dl/go1.22.3.linux-amd64.tar.gz | tar -xzf - -C /usr/local && chmod +x /usr/local/go/bin/go && ln -s /usr/local/go/bin/go /usr/bin/go
+END
 WORKDIR /usr/src
 COPY go.mod go.mod
 RUN go mod download
