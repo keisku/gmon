@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"debug/buildinfo"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"runtime/trace"
+	"strconv"
 	"strings"
 
 	"github.com/cilium/ebpf/rlimit"
@@ -85,6 +87,14 @@ func main() {
 
 	if runtime.GOARCH != "amd64" || runtime.GOOS != "linux" {
 		errlog.Fatalln("gmon only works on amd64 Linux")
+	}
+
+	binfo, err := buildinfo.ReadFile(*binPath)
+	if err != nil {
+		errlog.Fatalln(err)
+	}
+	if !isGoVersion123OrHigher(binfo.GoVersion) {
+		errlog.Fatalf("gmon requires Go 1.23 or higher, but %s is used for %s", binfo.GoVersion, binfo.Main.Path)
 	}
 
 	if *traceOutPath != "" {
@@ -160,4 +170,22 @@ func logTracePipe(done <-chan struct{}) {
 		}
 	}()
 	<-done
+}
+
+func isGoVersion123OrHigher(v string) bool {
+	versionSplit := strings.Split(v, ".")
+	if len(versionSplit) != 3 {
+		return false
+	}
+	if versionSplit[0] != "go1" {
+		return false
+	}
+	minor, err := strconv.Atoi(versionSplit[1])
+	if err != nil {
+		return false
+	}
+	if minor < 23 {
+		return false
+	}
+	return true
 }
