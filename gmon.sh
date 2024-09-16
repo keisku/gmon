@@ -28,21 +28,21 @@ fi
 image_buildenv=gmon-buildenv-$arch
 dockerfile_buildenv=$(mktemp)
 cat > "$dockerfile_buildenv" <<EOF
-FROM debian:bookworm-20240513@sha256:fac2c0fd33e88dfd3bc88a872cfb78dcb167e74af6162d31724df69e482f886c
+FROM debian:trixie-20240904@sha256:9f7b513ffd1a78901e6802e47ac03c3e8b5d5bafb06054ed8c757f9a043c2e60
 RUN <<END
 apt-get update
 apt-get install -y --no-install-recommends \
   ca-certificates \
-  clang-14 \
-  clang-format-14 \
+  clang-18 \
+  clang-format-18 \
   git \
   libbpf-dev \
-  llvm-14 \
+  llvm-18 \
   wget
-ln -s /usr/bin/llvm-strip-14 /usr/bin/llvm-strip
-ln -s /usr/bin/clang-14 /usr/bin/clang
-ln -s /usr/bin/clang-format-14 /usr/bin/clang-format
-wget -O- --no-check-certificate https://github.com/libbpf/bpftool/releases/download/v7.3.0/bpftool-v7.3.0-amd64.tar.gz | tar -xzf - -C /usr/bin && chmod +x /usr/bin/bpftool
+ln -s /usr/bin/llvm-strip-18 /usr/bin/llvm-strip
+ln -s /usr/bin/clang-18 /usr/bin/clang
+ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
+wget -O- --no-check-certificate https://github.com/libbpf/bpftool/releases/download/v7.4.0/bpftool-v7.4.0-amd64.tar.gz | tar -xzf - -C /usr/bin && chmod +x /usr/bin/bpftool
 wget -O- --no-check-certificate https://go.dev/dl/go1.23.1.linux-amd64.tar.gz | tar -xzf - -C /usr/local && chmod +x /usr/local/go/bin/go && ln -s /usr/local/go/bin/go /usr/bin/go
 END
 WORKDIR /usr/src
