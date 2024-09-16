@@ -24,9 +24,9 @@ int runtime_newproc1(struct pt_regs *ctx) {
         bpf_printk("%s:%d | failed to extract new goroutine pointer from retval\n", __FILE__, __LINE__);
         return 0;
     }
-    // `pahole -C runtime.g /path/to/gobinary 2>/dev/null` shows the offsets of the goid which is 152.
+    // `pahole -C runtime.g /path/to/gobinary 2>/dev/null` shows the offsets of the goid.
     int64_t goid = 0;
-    if (bpf_core_read_user(&goid, sizeof(int64_t), newg_p + 152)) {
+    if (bpf_core_read_user(&goid, sizeof(int64_t), newg_p + 160)) {
         bpf_printk("%s:%d | failed to read goroutine id from newg with the offset\n", __FILE__, __LINE__);
         return 0;
     }

@@ -18,7 +18,7 @@ struct gobuf_t {
     uintptr_t bp;
 };
 
-// https://github.com/golang/go/blob/release-branch.go1.21/src/runtime/runtime2.go#L447
+// https://github.com/golang/go/blob/release-branch.go1.23/src/runtime/runtime2.go#L458
 struct g_t {
     struct stack_t stack_instance;
     uintptr_t stackguard0;
@@ -29,6 +29,7 @@ struct g_t {
     struct gobuf_t sched;
     uintptr_t syscallsp;
     uintptr_t syscallpc;
+    uintptr_t syscallbp;
     uintptr_t stktopsp;
     uintptr_t param;
     uint32_t atomicstatus;

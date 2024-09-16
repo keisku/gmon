@@ -8,6 +8,7 @@
 
 - amd64 (x86_64)
 - Linux Kernel 5.8+ since `gmon` uses [BPF ring buffer](https://nakryiko.com/posts/bpf-ringbuf/)
+- Target Go binary must be compiled with Go 1.23+ since `gmon` uses fixed offset to get goroutine ID
 
 # Usage
 
